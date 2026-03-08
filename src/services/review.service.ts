@@ -26,17 +26,20 @@ export const createReview = async (data: Partial<Review>): Promise<Review> => {
   // TODO: Implement with Prisma
   return {
     id: 'temp-id',
-    propertyId: data.propertyId || '',
-    userId: data.userId || '',
-    rating: data.rating || 0,
-    title: data.title || '',
-    content: data.content || '',
+    propertyId: data.propertyId ?? '',
+    userId: data.userId ?? '',
+    rating: data.rating ?? 0,
+    title: data.title ?? '',
+    content: data.content ?? '',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 };
 
-export const updateReview = async (id: string, data: Partial<Review>): Promise<Review | null> => {
+export const updateReview = async (
+  id: string,
+  data: Partial<Review>,
+): Promise<Review | null> => {
   // TODO: Implement with Prisma
   console.log(`Updating review: ${id}`, data);
   return null;

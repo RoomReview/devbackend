@@ -1,4 +1,5 @@
-import { Request } from 'express';
+import type { Request } from 'express';
+import type { ZodType } from 'zod';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -27,7 +28,19 @@ export interface PaginatedResponse<T> {
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
+  statusCode: number;
   data?: T;
   message?: string;
   error?: string;
+  status?: string;
+}
+
+export interface ValidateRequestMiddlewareArgs<
+  TBody = unknown,
+  TParams = unknown,
+  TQuery = unknown
+> {
+  body?: ZodType<TBody>;
+  params?: ZodType<TParams>;
+  query?: ZodType<TQuery>;
 }

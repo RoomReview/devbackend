@@ -1,6 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
-export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
+export const authenticate = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
@@ -13,7 +17,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
 };
 
 export const authorize = (...roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (_req: Request, res: Response, next: NextFunction): void => {
     // TODO: Implement role-based authorization
     const userRole = 'user'; // Placeholder
 
