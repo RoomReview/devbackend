@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  userId           String    @id @default(uuid(7)) @map("user_id") @db.Uuid
+  email            String    @unique
+  firstName        String    @map("first_name")
+  lastName         String    @map("last_name")
+  passwordHash     String    @map("password_hash")
+  isEmailVerified  Boolean   @default(false) @map("is_email_verified")
+  isActive         Boolean   @default(true) @map("is_active")
+  role             UserRole  @default(TENANT)
+  verifyCodeHash   String?   @map("verify_code_hash")
+  verifiedAt       DateTime? @map("verified_at")
+  verifyCodeExpiry DateTime? @map("verify_code_expiry")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+enum UserRole {
+  TENANT
+  LANDLORD
+  ADMIN
+}
+
+model Session {
+  sessionId          Int       @id @default(autoincrement()) @map("session_id")
+  userId             String    @unique @map("user_id") @db.Uuid
+  accessTokenId      String?   @map("access_token_id") @db.Uuid
+  accessTokenExpiry  DateTime? @map("access_token_expiry")
+  refreshTokenId     String?   @map("refresh_token_id") @db.Uuid
+  refreshTokenExpiry DateTime? @map("refresh_token_expiry")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("sessions")
+}
