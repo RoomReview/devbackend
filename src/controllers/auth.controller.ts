@@ -47,15 +47,15 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
       user: typeof user;
       session: typeof session;
     }> = {
-      success: true,
-      statusCode: 200,
-      message: 'User logged in successfully',
-      data: {
+      success: session ? true : false,
+      statusCode: session ? 200 : 401,
+      message: session ? 'User logged in successfully' : 'Invalid credentials',
+      data: session ? {
         user,
         session,
-      },
+      } : undefined,
     };
-    return res.status(200).json(resultant);
+    return res.status(resultant.statusCode).json(resultant);
   } catch (error) {
     logContext.function = 'login';
     logger.error(logContext, 'Error in login controller', { error });
@@ -108,6 +108,7 @@ export const emailVerify = async (
   res: Response,
 ): Promise<Response> => {
   try {
+    console.log('entered here', req.query)
     const { user } = await verifyEmail((req?.query as VerifyEmailCodeDto));
     const resultant: ApiResponse<{ user: typeof user }> = {
       success: true,

@@ -12,7 +12,7 @@ import {
 } from '@/repositories/sessions.repository';
 import { generateAccessToken, generateRefreshToken } from './jwt.token.service';
 import logger, { LogContext } from '@/utils/logger';
-import { EntityNotFoundError, ValidationError } from '@utils/custom-error';
+import { EntityNotFoundError, UnauthorizedError, ValidationError } from '@utils/custom-error';
 import {
   findUserByVerifyCodeHash,
   updateUserVerifyCode,
@@ -74,7 +74,10 @@ export const loginUser = async (email: string, password: string) => {
   }
 
   if (!(await comparePassword(password, user.passwordHash))) {
-    return { user: userWithoutPassword, session: null };
+    throw new UnauthorizedError({
+      message: 'Invalid credentials',
+      code: 'VALIDATION_ERROR',
+    });
   }
 
   const accessTokenObj = generateAccessToken({ email: user.email, sub: user.userId, role: user.role });
@@ -84,7 +87,7 @@ export const loginUser = async (email: string, password: string) => {
   // TBD: Does application allow multiple sessions? If not, we can update the existing session instead of creating new one
   const currentSession = await upsertSession({ userId: user.userId, accessTokenId: accessTokenObj?.jti ?? null, refreshTokenId: refreshTokenObj?.jti ?? null, accessTokenExpiry: accessTokenObj.expiresAt ?? null, refreshTokenExpiry: refreshTokenObj.expiresAt ?? null });
 
-  return { user: userWithoutPassword, session: currentSession };
+  return { user: userWithoutPassword, session: { ...currentSession, accessToken: accessTokenObj.token, refreshToken: refreshTokenObj.token } };
 };
 
 export const logoutUser = async (userId: string) => {

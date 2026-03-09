@@ -47,7 +47,7 @@ export const logoutSessionByUserId = async (userId: string) => {
   });
 };
 
-export const upsertSession = async (data: Omit<SessionModel, 'sessionId'| 'updatedAt' | 'createdAt'>) => {
+export const upsertSession = async (data: Omit<SessionModel, 'sessionId' | 'updatedAt' | 'createdAt'>) => {
   const { userId, accessTokenId, accessTokenExpiry, refreshTokenId, refreshTokenExpiry } = data;
   return await prisma.session.upsert({
     where: { userId: userId },
@@ -63,6 +63,10 @@ export const upsertSession = async (data: Omit<SessionModel, 'sessionId'| 'updat
       accessTokenExpiry: accessTokenExpiry,
       refreshTokenId: refreshTokenId,
       refreshTokenExpiry: refreshTokenExpiry,
+    },
+    select: {
+      sessionId: true,
+      userId: true,
     },
   });
 };
