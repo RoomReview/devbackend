@@ -1,29 +1,38 @@
-import type { Request, Response, NextFunction } from 'express';
+import { permissions } from '@/config/permissions';
+import { validateAccessToken } from '@/services/auth.service';
+import type { AuthenticatedRequest } from '@/types';
+import { UnauthorizedError } from '@/utils/custom-error';
+import type { NextFunction, Response } from 'express';
 
-export const authenticate = (
-  req: Request,
-  res: Response,
+export const authenticate = async (
+  req: AuthenticatedRequest,
+  _res: Response,
   next: NextFunction,
-): void => {
+): Promise<void> => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
-    res.status(401).json({ error: 'Authentication required' });
-    return;
+    throw new UnauthorizedError({ message: 'No token provided' });
   }
 
-  // TODO: Implement JWT verification
+  const { user } = await validateAccessToken(token);
+
+  req.user = { userId: user.userId, email: user.email, role: user.role };
+
   next();
 };
 
-export const authorize = (...roles: string[]) => {
-  return (_req: Request, res: Response, next: NextFunction): void => {
-    // TODO: Implement role-based authorization
-    const userRole = 'user'; // Placeholder
+export const authorize = (...pems: (keyof typeof permissions)[]) => {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction): void => {
+    const { user } = req;
+    const { userId, role } = user || {};
+    if (!user && !userId && !role) {
+      throw new UnauthorizedError({ message: 'No user authenticated' });
+    }
 
-    if (!roles.includes(userRole)) {
-      res.status(403).json({ error: 'Insufficient permissions' });
-      return;
+    const isAllowed = pems.some(each => permissions[each].includes(role as any));
+    if (!isAllowed) {
+      throw new UnauthorizedError({ message: 'Insufficient permissions' });
     }
 
     next();

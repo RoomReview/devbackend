@@ -3,7 +3,7 @@ import type { ZodType } from 'zod';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
-    id: string;
+    userId: string;
     email: string;
     role: string;
   };
@@ -43,4 +43,9 @@ export interface ValidateRequestMiddlewareArgs<
   body?: ZodType<TBody>;
   params?: ZodType<TParams>;
   query?: ZodType<TQuery>;
+}
+
+export interface PaginateArgs {
+  page: number;
+  limit: number;
 }
