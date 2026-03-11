@@ -1,17 +1,39 @@
-import { Request, Response, NextFunction } from 'express';
+import { ValidateRequestMiddlewareArgs } from '@/types';
+import { ValidationError } from '@/utils/custom-error';
+import type { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
 
-export const validateRequest = (schema: {
-  body?: Record<string, unknown>;
-  params?: Record<string, unknown>;
-  query?: Record<string, unknown>;
-}) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    // TODO: Implement schema validation (e.g., with Zod or Joi)
-    if (schema.body && !req.body) {
-      res.status(400).json({ error: 'Request body is required' });
-      return;
+export const validateRequest = <
+  TBody = unknown,
+  TParams = unknown,
+  TQuery = unknown,
+>(
+  schemas: ValidateRequestMiddlewareArgs<TBody, TParams, TQuery>,
+) => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    try {
+      if (schemas.body) {
+        schemas.body.parse(req.body);
+      }
+      if (schemas.params) {
+        schemas.params.parse(req.params) as any;
+      }
+      if (schemas.query) {
+        schemas.query.parse(req.query) as any;
+      }
+      return next();
+    } catch (error) {
+      let data = null;
+      if (error instanceof ZodError) {
+        data = error.issues || [];
+      }
+      return next(
+        new ValidationError({
+          message: 'Invalid request data',
+          code: 'VALIDATION_ERROR',
+          data,
+        }),
+      );
     }
-
-    next();
   };
 };

@@ -15,32 +15,41 @@ export const findAllProperties = async (): Promise<Property[]> => {
   return [];
 };
 
-export const findPropertyById = async (id: string): Promise<Property | null> => {
+export const findPropertyById = async (
+  id: string,
+): Promise<Property | null> => {
   // TODO: Implement with Prisma
   console.log(`Finding property: ${id}`);
   return null;
 };
 
-export const findPropertiesByPostcode = async (postcode: string): Promise<Property[]> => {
+export const findPropertiesByPostcode = async (
+  postcode: string,
+): Promise<Property[]> => {
   // TODO: Implement with Prisma
   console.log(`Finding properties by postcode: ${postcode}`);
   return [];
 };
 
-export const createProperty = async (data: Partial<Property>): Promise<Property> => {
+export const createProperty = async (
+  data: Partial<Property>,
+): Promise<Property> => {
   // TODO: Implement with Prisma
   return {
     id: 'temp-id',
-    address: data.address || '',
-    postcode: data.postcode || '',
-    city: data.city || '',
-    propertyType: data.propertyType || '',
+    address: data.address ?? '',
+    postcode: data.postcode ?? '',
+    city: data.city ?? '',
+    propertyType: data.propertyType ?? '',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 };
 
-export const updateProperty = async (id: string, data: Partial<Property>): Promise<Property | null> => {
+export const updateProperty = async (
+  id: string,
+  data: Partial<Property>,
+): Promise<Property | null> => {
   // TODO: Implement with Prisma
   console.log(`Updating property: ${id}`, data);
   return null;
