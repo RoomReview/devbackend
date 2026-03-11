@@ -54,3 +54,20 @@ export const verifyUserEmail = async (email: string) => {
     },
   });
 };
+
+export const findAllUsers = async (limit:number, offset:number) => {
+  return await prisma.user.findMany({
+    take: limit,
+    skip: offset,
+    select: {
+      userId: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      isEmailVerified: true,
+      isActive: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+}

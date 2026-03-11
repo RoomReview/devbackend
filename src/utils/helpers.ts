@@ -19,3 +19,9 @@ export const isValidPostcode = (postcode: string): boolean => {
   const postcodeRegex = /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i;
   return postcodeRegex.test(postcode);
 };
+
+export const paginate = (page: number, limit: number): { offset: number; limit: number } => {
+  const offset = (page - 1) * limit;
+  return { offset, limit };
+}
+

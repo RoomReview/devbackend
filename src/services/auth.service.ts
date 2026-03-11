@@ -7,10 +7,11 @@ import {
 import { comparePassword, hashPassword } from './password.service';
 import { generateVerificationCode, verifyCode, isCodeExpired } from './token.service';
 import {
+  findUserSessionByAccessTokenId,
   logoutSessionByUserId,
   upsertSession,
 } from '@/repositories/sessions.repository';
-import { generateAccessToken, generateRefreshToken } from './jwt.token.service';
+import { generateAccessToken, generateRefreshToken, verifyAccessToken } from './jwt.token.service';
 import logger, { LogContext } from '@/utils/logger';
 import { EntityNotFoundError, UnauthorizedError, ValidationError } from '@utils/custom-error';
 import {
@@ -156,4 +157,23 @@ export const verifyEmail = async (data: VerifyEmailCodeDto) => {
   logger.info(logContext, 'Email verified successfully', { email: user.email });
 
   return { user: updatedUser };
+};
+
+export const validateAccessToken = async (token: string) => {
+  logContext.function = 'validateAccessToken';
+  const { email, role, sub, jti } = verifyAccessToken(token);
+  if (!email) {
+    throw new UnauthorizedError({ message: 'Invalid token' });
+  }
+
+  if (!jti) {
+    throw new UnauthorizedError({ message: 'Invalid token' });
+  }
+
+  const session = await findUserSessionByAccessTokenId(jti, sub);
+  if (!session) {
+    throw new UnauthorizedError({ message: 'Invalid token' });
+  }
+
+  return { user: { email, role, userId: sub }, session };
 };

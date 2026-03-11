@@ -70,3 +70,9 @@ export const upsertSession = async (data: Omit<SessionModel, 'sessionId' | 'upda
     },
   });
 };
+/**
+ * find user session by userId & access token id
+ */
+export const findUserSessionByAccessTokenId = async (accessTokenId: string, userId: string) => {
+  return await prisma.session.findFirst({ where: { accessTokenId, userId } });
+};

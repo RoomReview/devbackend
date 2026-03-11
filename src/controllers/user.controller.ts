@@ -1,11 +1,22 @@
+import { findAllUsers } from '@/services/user.service';
+import { ApiResponse } from '@/types';
 import type { Request, Response } from 'express';
 
 export const getAllUsers = async (
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<void> => {
   try {
-    res.status(200).json({ message: 'Get all users' });
+    const { page = 1, limit = 10 } = req.query;
+    const { users } = await findAllUsers({ page: Number(page), limit: Number(limit) });
+    const resultant: ApiResponse<{ users: typeof users }> = {
+      message: 'Get all users',
+      data: { users },
+      statusCode: 200,
+      success: true,
+    };
+
+    res.status(resultant.statusCode).json(resultant);
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -68,4 +79,4 @@ export const activateUser = async (
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
