@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { loginUser, registerUser, logoutUser, resetEmailVerification, verifyEmail } from '@/services/auth.service';
+import { loginUser, registerUser, logoutUser, resetEmailVerification, verifyEmail, refreshAccessToken } from '@/services/auth.service';
 import { ApiResponse } from '@/types';
 import logger, { LogContext } from '@/utils/logger';
 import { VerifyEmailCodeDto } from '@/dto/auth.dto';
@@ -120,6 +120,27 @@ export const emailVerify = async (
   } catch (error) {
     logContext.function = 'emailVerify';
     logger.error(logContext, 'Error in emailVerify controller', { error });
+    throw error;
+  }
+};
+
+export const refresh = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { userId, refreshToken } = req.body as { userId: string; refreshToken: string };
+    const { accessToken, expiresAt } = await refreshAccessToken(userId, refreshToken);
+    const resultant: ApiResponse<{ accessToken: string; expiresAt: Date | undefined }> = {
+      success: true,
+      statusCode: 200,
+      message: 'Access token refreshed successfully',
+      data: { accessToken, expiresAt },
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'refresh';
+    logger.error(logContext, 'Error in refresh controller', { error });
     throw error;
   }
 };

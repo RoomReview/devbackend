@@ -37,3 +37,10 @@ export const VerifyEmailCodeDto = object({
 });
 
 export type VerifyEmailCodeDto = _infer<typeof VerifyEmailCodeDto>;
+
+export const RefreshTokenDto = object({
+  userId: uuid(),
+  refreshToken: string().min(1),
+});
+
+export type RefreshTokenDto = _infer<typeof RefreshTokenDto>;

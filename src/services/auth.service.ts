@@ -8,10 +8,12 @@ import { comparePassword, hashPassword } from '../utils/password';
 import { generateVerificationCode, verifyCode, isCodeExpired } from '../utils/token';
 import {
   findUserSessionByAccessTokenId,
+  findUserSessionByRefreshTokenId,
   logoutSessionByUserId,
+  updateSessionAccessTokenId,
   upsertSession,
 } from '@/repositories/sessions.repository';
-import { generateAccessToken, generateRefreshToken, verifyAccessToken } from '../utils/jwt.token';
+import { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken } from '../utils/jwt.token';
 import logger, { LogContext } from '@/utils/logger';
 import { EntityNotFoundError, UnauthorizedError, ValidationError } from '@utils/custom-error';
 import {
@@ -176,4 +178,40 @@ export const validateAccessToken = async (token: string) => {
   }
 
   return { user: { email, role, userId: sub }, session };
+};
+
+export const refreshAccessToken = async (userId: string, refreshToken: string) => {
+  logContext.function = 'refreshAccessToken';
+
+  // Verify signature, expiry, issuer & audience — throws UnauthorizedError on failure
+  const { sub, email, role, jti } = verifyRefreshToken(refreshToken);
+
+  // Defence-in-depth: confirm JWT subject matches the supplied userId
+  if (sub !== userId) {
+    throw new UnauthorizedError({ message: 'Token does not match the provided userId' });
+  }
+
+  if (!jti) {
+    throw new UnauthorizedError({ message: 'Invalid refresh token: missing jti' });
+  }
+
+  // Look up live session — absence means the token was revoked or never stored
+  const session = await findUserSessionByRefreshTokenId(jti, userId);
+  if (!session) {
+    throw new UnauthorizedError({ message: 'Refresh token is not recognised or has been revoked' });
+  }
+
+  // Issue a fresh access token
+  const accessTokenObj = generateAccessToken({ email, sub: userId, role });
+
+  // Persist the new access token JTI + expiry on the session
+  await updateSessionAccessTokenId({
+    sessionId: session.sessionId,
+    accessTokenId: accessTokenObj.jti ?? null,
+    accessTokenExpiry: accessTokenObj.expiresAt ?? null,
+  });
+
+  logger.info(logContext, 'Access token refreshed', { userId });
+
+  return { accessToken: accessTokenObj.token, expiresAt: accessTokenObj.expiresAt };
 };

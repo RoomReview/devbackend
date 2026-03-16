@@ -2,7 +2,8 @@ import { permissions } from '@/config/permissions';
 import { validateAccessToken } from '@/services/auth.service';
 import type { AuthenticatedRequest } from '@/types';
 import { UnauthorizedError } from '@/utils/custom-error';
-import type { NextFunction, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
+import { verifyRefreshToken } from '@/utils/jwt.token';
 
 export const authenticate = async (
   req: AuthenticatedRequest,
@@ -15,9 +16,9 @@ export const authenticate = async (
     throw new UnauthorizedError({ message: 'No token provided' });
   }
 
-  const { user } = await validateAccessToken(token);
+  const { user, session } = await validateAccessToken(token);
 
-  req.user = { userId: user.userId, email: user.email, role: user.role };
+  req.user = { userId: user.userId, email: user.email, role: user.role, accessTokenId: session?.accessTokenId ?? '' };
 
   next();
 };
@@ -37,4 +38,26 @@ export const authorize = (...pems: (keyof typeof permissions)[]) => {
 
     next();
   };
+};
+
+/**
+ * Middleware for the refresh endpoint.
+ * Decodes the refresh token from req.body and confirms its `sub` claim
+ * matches req.body.userId. Must run after validateRequest so the body
+ * is already parsed and typed.
+ */
+export const requireBodyUserMatch = (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void => {
+  const { userId, refreshToken } = req.body as { userId: string; refreshToken: string };
+
+  const decoded = verifyRefreshToken(refreshToken);
+
+  if (decoded.sub !== userId) {
+    throw new UnauthorizedError({ message: 'Token does not match the provided userId' });
+  }
+
+  next();
 };
