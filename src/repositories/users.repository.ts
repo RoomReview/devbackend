@@ -70,4 +70,26 @@ export const findAllUsers = async (limit:number, offset:number) => {
       createdAt: true,
     },
   });
-}
+};
+
+export const findUserById = async (userId: string, select?: UserSelect) => {
+  return await prisma.user.findUnique({ where: { userId }, select });
+};
+
+export const updateUserPassword = async (userId: string, passwordHash: string) => {
+  return await prisma.user.update({
+    where: { userId },
+    data: { passwordHash },
+  });
+};
+
+export const updateUserPasswordAndClearCode = async (userId: string, passwordHash: string) => {
+  return await prisma.user.update({
+    where: { userId },
+    data: { 
+      passwordHash,
+      verifyCodeHash: null,
+      verifyCodeExpiry: null
+    },
+  });
+};

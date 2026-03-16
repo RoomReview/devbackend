@@ -1,11 +1,12 @@
-import { RegisterUserDto, VerifyEmailCodeDto } from '@/dto/auth.dto';
+import { RegisterUserDto, VerifyEmailCodeDto, ResetPasswordDto } from '@/dto/auth.dto';
 import {
   createUser,
   findUserByEmail,
   getUserSensitiveByEmail,
+  updateUserPasswordAndClearCode,
 } from './user.service';
 import { comparePassword, hashPassword } from '../utils/password';
-import { generateVerificationCode, verifyCode, isCodeExpired } from '../utils/token';
+import { generateVerificationCode, verifyCode, isCodeExpired, hashCode } from '../utils/token';
 import {
   findUserSessionByAccessTokenId,
   findUserSessionByRefreshTokenId,
@@ -125,11 +126,84 @@ export const resetEmailVerification = async (email: string) => {
   return { isNewCodeGenerated: true };
 };
 
+export const forgotPassword = async (email: string) => {
+  logContext.function = 'forgotPassword';
+
+  const user = await findUserByEmail(email);
+  if (!user) {
+    // Return early to prevent email enumeration, keeping the same success shape.
+    return { isEmailSent: true };
+  }
+
+  if (!user.isActive) {
+    throw new ValidationError({
+      message: 'Account is deactivated',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  const token = generateVerificationCode();
+
+  await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
+
+  // TODO: Send password reset email with the 6-digit code `token.code`
+  logger.info(logContext, 'Password reset code generated — dev-only log', { email, code: token.code });
+
+  return { isEmailSent: true };
+};
+
+export const resetPassword = async (data: ResetPasswordDto) => {
+  logContext.function = 'resetPassword';
+  const { email, code, newPassword } = data;
+
+
+  const hashedCode = hashCode(code);
+  const user = await findUserByVerifyCodeHash(email, hashedCode);
+
+  if (!user) {
+    throw new ValidationError({
+      message: 'Invalid verification code',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  // Note: we fetch the full user from findUserByVerifyCodeHash so we don't need to re-fetch
+  // Wait, let's fetch full user details just to be safe they are active
+  const fullUser = await findUserByEmail(email);
+  if (!fullUser || !fullUser.isActive) {
+    throw new ValidationError({
+      message: 'Account is deactivated',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  if (!user.verifyCodeExpiry || isCodeExpired(user.verifyCodeExpiry)) {
+    throw new ValidationError({
+      message: 'Verification code has expired',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  if (!verifyCode(code, user.verifyCodeHash!)) {
+    throw new ValidationError({
+      message: 'Invalid verification code',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  const newHashedPassword = await hashPassword(newPassword);
+  await updateUserPasswordAndClearCode(user.userId, newHashedPassword);
+
+  // TODO: send password reset confirmation email
+
+  return { success: true };
+};
+
 export const verifyEmail = async (data: VerifyEmailCodeDto) => {
   logContext.function = 'verifyEmail';
   const { code, email } = data;
 
-  const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
+  const hashedCode = hashCode(code);
 
   const user = await findUserByVerifyCodeHash(email, hashedCode);
 

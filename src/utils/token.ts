@@ -7,7 +7,7 @@ interface VerificationCode {
 }
 const expirationMinutes = 15;
 
-const hashCode = (code: string): string => {
+export const hashCode = (code: string): string => {
   return crypto.createHash('sha256').update(code).digest('hex');
 };
 

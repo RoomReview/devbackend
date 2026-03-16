@@ -1,4 +1,4 @@
-import { findAllUsers } from '@/services/user.service';
+import { findAllUsers, changePassword as changePasswordService } from '@/services/user.service';
 import { ApiResponse } from '@/types';
 import type { Request, Response } from 'express';
 
@@ -79,4 +79,19 @@ export const activateUser = async (
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
+};
+
+export const changePassword = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const { userId } = req.params;
+  await changePasswordService(userId as string, req.body);
+  const resultant: ApiResponse<null> = {
+    message: 'Password changed successfully',
+    data: null,
+    statusCode: 200,
+    success: true,
+  };
+  res.status(200).json(resultant);
 };

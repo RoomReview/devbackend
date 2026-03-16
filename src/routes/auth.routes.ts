@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as authController from '@controllers/auth.controller';
-import { RegisterUserDto, LoginUserDto, LogoutUserDto, VerifyEmailDto, VerifyEmailCodeDto, RefreshTokenDto } from '@/dto/auth.dto';
+import { RegisterUserDto, LoginUserDto, LogoutUserDto, VerifyEmailDto, VerifyEmailCodeDto, RefreshTokenDto, ResetPasswordDto, ForgotPasswordDto } from '@/dto/auth.dto';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { requireBodyUserMatch } from '@/middleware/auth.middleware';
 
@@ -12,5 +12,7 @@ router.post('/logout', validateRequest({ body: LogoutUserDto }), authController.
 router.post('/email/verify/reset', validateRequest({ body: VerifyEmailDto }), authController.emailVerifyReset);
 router.get('/email/verify', validateRequest({ query: VerifyEmailCodeDto }), authController.emailVerify);
 router.post('/refresh', validateRequest({ body: RefreshTokenDto }), requireBodyUserMatch, authController.refresh);
+router.post('/forgot-password', validateRequest({ body: ForgotPasswordDto }), authController.forgotPassword);
+router.post('/reset-password', validateRequest({ body: ResetPasswordDto }), authController.resetPassword);
 
 export default router;

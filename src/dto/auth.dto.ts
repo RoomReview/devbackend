@@ -44,3 +44,17 @@ export const RefreshTokenDto = object({
 });
 
 export type RefreshTokenDto = _infer<typeof RefreshTokenDto>;
+
+export const ForgotPasswordDto = object({
+  email: email({ pattern: regexes.email }),
+});
+
+export type ForgotPasswordDto = _infer<typeof ForgotPasswordDto>;
+
+export const ResetPasswordDto = object({
+  email: email({ pattern: regexes.email }),
+  code: string().length(6),
+  newPassword: string().min(6),
+});
+
+export type ResetPasswordDto = _infer<typeof ResetPasswordDto>;

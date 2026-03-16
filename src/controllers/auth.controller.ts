@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { loginUser, registerUser, logoutUser, resetEmailVerification, verifyEmail, refreshAccessToken } from '@/services/auth.service';
+import { loginUser, registerUser, logoutUser, resetEmailVerification, verifyEmail, refreshAccessToken, resetPassword as resetPasswordService, forgotPassword as forgotPasswordService } from '@/services/auth.service';
 import { ApiResponse } from '@/types';
 import logger, { LogContext } from '@/utils/logger';
 import { VerifyEmailCodeDto } from '@/dto/auth.dto';
@@ -141,6 +141,48 @@ export const refresh = async (
   } catch (error) {
     logContext.function = 'refresh';
     logger.error(logContext, 'Error in refresh controller', { error });
+    throw error;
+  }
+};
+
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    await resetPasswordService(req.body);
+    const resultant: ApiResponse<null> = {
+      success: true,
+      statusCode: 200,
+      message: 'Password reset successfully',
+      data: null,
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'resetPassword';
+    logger.error(logContext, 'Error in resetPassword controller', { error });
+    throw error;
+  }
+};
+
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { email } = req.body;
+    await forgotPasswordService(email);
+    // Return a generic success to prevent email enumeration
+    const resultant: ApiResponse<null> = {
+      success: true,
+      statusCode: 200,
+      message: 'If the email exists, a password reset code has been sent.',
+      data: null,
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'forgotPassword';
+    logger.error(logContext, 'Error in forgotPassword controller', { error });
     throw error;
   }
 };
