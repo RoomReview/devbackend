@@ -10,9 +10,10 @@ type CapturedCall = { args: unknown[] };
  * Temporarily replaces a console method with a spy that records calls.
  * Returns both the recorded calls array and a restore function.
  */
-function spyOn(
-  method: 'log' | 'warn' | 'error' | 'debug',
-): { calls: CapturedCall[]; restore: () => void } {
+function spyOn(method: 'log' | 'warn' | 'error' | 'debug'): {
+  calls: CapturedCall[];
+  restore: () => void;
+} {
   const calls: CapturedCall[] = [];
   const original = console[method];
   console[method] = (...args: unknown[]) => {
@@ -148,7 +149,11 @@ describe('logger', () => {
         warnSpy.restore();
       }
       equal(logSpy.calls.length, 0, 'INFO should be suppressed at ERROR level');
-      equal(warnSpy.calls.length, 0, 'WARN should be suppressed at ERROR level');
+      equal(
+        warnSpy.calls.length,
+        0,
+        'WARN should be suppressed at ERROR level',
+      );
     });
 
     it('should still output ERROR when LOG_LEVEL is ERROR', () => {
@@ -173,8 +178,15 @@ describe('logger', () => {
         logSpy.restore();
         debugSpy.restore();
       }
-      ok(logSpy.calls.length > 0, 'INFO should be output (fallback level is INFO)');
-      equal(debugSpy.calls.length, 0, 'DEBUG should be suppressed at default INFO level');
+      ok(
+        logSpy.calls.length > 0,
+        'INFO should be output (fallback level is INFO)',
+      );
+      equal(
+        debugSpy.calls.length,
+        0,
+        'DEBUG should be suppressed at default INFO level',
+      );
     });
   });
 });

@@ -57,7 +57,10 @@ describe('custom-error', () => {
 
   describe('EntityNotFoundError', () => {
     it('should have a default statusCode of 404', () => {
-      const err = new EntityNotFoundError({ message: 'Not found', code: 'ENTITY_NOT_FOUND' });
+      const err = new EntityNotFoundError({
+        message: 'Not found',
+        code: 'ENTITY_NOT_FOUND',
+      });
       equal(err.statusCode, 404);
     });
 
@@ -109,7 +112,10 @@ describe('custom-error', () => {
 
   describe('ValidationError', () => {
     it('should have a default statusCode of 400', () => {
-      const err = new ValidationError({ message: 'Bad input', code: 'VALIDATION_ERROR' });
+      const err = new ValidationError({
+        message: 'Bad input',
+        code: 'VALIDATION_ERROR',
+      });
       equal(err.statusCode, 400);
     });
 
@@ -119,7 +125,10 @@ describe('custom-error', () => {
 
     it('should store validation details in data', () => {
       const details = [{ field: 'email', issue: 'invalid format' }];
-      const err = new ValidationError({ message: 'Validation failed', data: details });
+      const err = new ValidationError({
+        message: 'Validation failed',
+        data: details,
+      });
       strictEqual(err.data, details);
     });
   });

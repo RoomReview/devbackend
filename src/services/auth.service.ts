@@ -1,4 +1,8 @@
-import { RegisterUserDto, VerifyEmailCodeDto, ResetPasswordDto } from '@/dto/auth.dto';
+import {
+  RegisterUserDto,
+  VerifyEmailCodeDto,
+  ResetPasswordDto,
+} from '@/dto/auth.dto';
 import {
   createUser,
   findUserByEmail,
@@ -6,7 +10,12 @@ import {
   updateUserPasswordAndClearCode,
 } from './user.service';
 import { comparePassword, hashPassword } from '../utils/password';
-import { generateVerificationCode, verifyCode, isCodeExpired, hashCode } from '../utils/token';
+import {
+  generateVerificationCode,
+  verifyCode,
+  isCodeExpired,
+  hashCode,
+} from '../utils/token';
 import {
   findUserSessionByAccessTokenId,
   findUserSessionByRefreshTokenId,
@@ -14,20 +23,28 @@ import {
   updateSessionAccessTokenId,
   upsertSession,
 } from '@/repositories/sessions.repository';
-import { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken } from '../utils/jwt.token';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
+} from '../utils/jwt.token';
 import logger, { LogContext } from '@/utils/logger';
-import { EntityNotFoundError, UnauthorizedError, ValidationError } from '@utils/custom-error';
+import {
+  EntityNotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@utils/custom-error';
 import {
   findUserByVerifyCodeHash,
   updateUserVerifyCode,
   verifyUserEmail as verifyUserEmailRepo,
 } from '@/repositories/users.repository';
 
-
 const logContext: LogContext = {
   service: 'auth.service',
-  function: ''
-}
+  function: '',
+};
 
 export const registerUser = async (data: RegisterUserDto) => {
   logContext.function = 'registerUser';
@@ -84,14 +101,35 @@ export const loginUser = async (email: string, password: string) => {
     });
   }
 
-  const accessTokenObj = generateAccessToken({ email: user.email, sub: user.userId, role: user.role });
+  const accessTokenObj = generateAccessToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
 
-  const refreshTokenObj = generateRefreshToken({ email: user.email, sub: user.userId, role: user.role });
+  const refreshTokenObj = generateRefreshToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
 
   // TBD: Does application allow multiple sessions? If not, we can update the existing session instead of creating new one
-  const currentSession = await upsertSession({ userId: user.userId, accessTokenId: accessTokenObj?.jti ?? null, refreshTokenId: refreshTokenObj?.jti ?? null, accessTokenExpiry: accessTokenObj.expiresAt ?? null, refreshTokenExpiry: refreshTokenObj.expiresAt ?? null });
+  const currentSession = await upsertSession({
+    userId: user.userId,
+    accessTokenId: accessTokenObj?.jti ?? null,
+    refreshTokenId: refreshTokenObj?.jti ?? null,
+    accessTokenExpiry: accessTokenObj.expiresAt ?? null,
+    refreshTokenExpiry: refreshTokenObj.expiresAt ?? null,
+  });
 
-  return { user: userWithoutPassword, session: { ...currentSession, accessToken: accessTokenObj.token, refreshToken: refreshTokenObj.token } };
+  return {
+    user: userWithoutPassword,
+    session: {
+      ...currentSession,
+      accessToken: accessTokenObj.token,
+      refreshToken: refreshTokenObj.token,
+    },
+  };
 };
 
 export const logoutUser = async (userId: string) => {
@@ -121,7 +159,10 @@ export const resetEmailVerification = async (email: string) => {
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
 
   // TODO: replace with actual email send once email service is integrated
-  logger.info(logContext, 'Verification code reset — dev-only log', { email, code: token.code });
+  logger.info(logContext, 'Verification code reset — dev-only log', {
+    email,
+    code: token.code,
+  });
 
   return { isNewCodeGenerated: true };
 };
@@ -147,7 +188,10 @@ export const forgotPassword = async (email: string) => {
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
 
   // TODO: Send password reset email with the 6-digit code `token.code`
-  logger.info(logContext, 'Password reset code generated — dev-only log', { email, code: token.code });
+  logger.info(logContext, 'Password reset code generated — dev-only log', {
+    email,
+    code: token.code,
+  });
 
   return { isEmailSent: true };
 };
@@ -155,7 +199,6 @@ export const forgotPassword = async (email: string) => {
 export const resetPassword = async (data: ResetPasswordDto) => {
   logContext.function = 'resetPassword';
   const { email, code, newPassword } = data;
-
 
   const hashedCode = hashCode(code);
   const user = await findUserByVerifyCodeHash(email, hashedCode);
@@ -170,7 +213,7 @@ export const resetPassword = async (data: ResetPasswordDto) => {
   // Note: we fetch the full user from findUserByVerifyCodeHash so we don't need to re-fetch
   // Wait, let's fetch full user details just to be safe they are active
   const fullUser = await findUserByEmail(email);
-  if (!fullUser || !fullUser.isActive) {
+  if (!fullUser?.isActive) {
     throw new ValidationError({
       message: 'Account is deactivated',
       code: 'VALIDATION_ERROR',
@@ -254,7 +297,10 @@ export const validateAccessToken = async (token: string) => {
   return { user: { email, role, userId: sub }, session };
 };
 
-export const refreshAccessToken = async (userId: string, refreshToken: string) => {
+export const refreshAccessToken = async (
+  userId: string,
+  refreshToken: string,
+) => {
   logContext.function = 'refreshAccessToken';
 
   // Verify signature, expiry, issuer & audience — throws UnauthorizedError on failure
@@ -262,17 +308,23 @@ export const refreshAccessToken = async (userId: string, refreshToken: string) =
 
   // Defence-in-depth: confirm JWT subject matches the supplied userId
   if (sub !== userId) {
-    throw new UnauthorizedError({ message: 'Token does not match the provided userId' });
+    throw new UnauthorizedError({
+      message: 'Token does not match the provided userId',
+    });
   }
 
   if (!jti) {
-    throw new UnauthorizedError({ message: 'Invalid refresh token: missing jti' });
+    throw new UnauthorizedError({
+      message: 'Invalid refresh token: missing jti',
+    });
   }
 
   // Look up live session — absence means the token was revoked or never stored
   const session = await findUserSessionByRefreshTokenId(jti, userId);
   if (!session) {
-    throw new UnauthorizedError({ message: 'Refresh token is not recognised or has been revoked' });
+    throw new UnauthorizedError({
+      message: 'Refresh token is not recognised or has been revoked',
+    });
   }
 
   // Issue a fresh access token
@@ -287,5 +339,8 @@ export const refreshAccessToken = async (userId: string, refreshToken: string) =
 
   logger.info(logContext, 'Access token refreshed', { userId });
 
-  return { accessToken: accessTokenObj.token, expiresAt: accessTokenObj.expiresAt };
+  return {
+    accessToken: accessTokenObj.token,
+    expiresAt: accessTokenObj.expiresAt,
+  };
 };

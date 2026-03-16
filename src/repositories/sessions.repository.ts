@@ -1,7 +1,4 @@
-import {
-  SessionCreateInput,
-  SessionModel,
-} from '@/generated/prisma/models';
+import { SessionCreateInput, SessionModel } from '@/generated/prisma/models';
 import prisma from '@config/database';
 
 export const fetchSessionByUserId = async (userId: string) => {
@@ -17,18 +14,9 @@ export const deleteSessionsByUserId = async (userId: string) => {
 };
 
 export const updateSessionAccessTokenId = async (
-  data: Pick<
-    SessionModel,
-    | 'sessionId'
-    | 'accessTokenId'
-    | 'accessTokenExpiry'
-  >,
+  data: Pick<SessionModel, 'sessionId' | 'accessTokenId' | 'accessTokenExpiry'>,
 ) => {
-  const {
-    sessionId,
-    accessTokenId,
-    accessTokenExpiry,
-  } = data;
+  const { sessionId, accessTokenId, accessTokenExpiry } = data;
   return await prisma.session.update({
     where: { sessionId },
     data: { accessTokenId, accessTokenExpiry },
@@ -47,22 +35,30 @@ export const logoutSessionByUserId = async (userId: string) => {
   });
 };
 
-export const upsertSession = async (data: Omit<SessionModel, 'sessionId' | 'updatedAt' | 'createdAt'>) => {
-  const { userId, accessTokenId, accessTokenExpiry, refreshTokenId, refreshTokenExpiry } = data;
+export const upsertSession = async (
+  data: Omit<SessionModel, 'sessionId' | 'updatedAt' | 'createdAt'>,
+) => {
+  const {
+    userId,
+    accessTokenId,
+    accessTokenExpiry,
+    refreshTokenId,
+    refreshTokenExpiry,
+  } = data;
   return await prisma.session.upsert({
-    where: { userId: userId },
+    where: { userId },
     update: {
-      accessTokenId: accessTokenId,
-      accessTokenExpiry: accessTokenExpiry,
-      refreshTokenId: refreshTokenId,
-      refreshTokenExpiry: refreshTokenExpiry,
+      accessTokenId,
+      accessTokenExpiry,
+      refreshTokenId,
+      refreshTokenExpiry,
     },
     create: {
-      userId: userId,
-      accessTokenId: accessTokenId,
-      accessTokenExpiry: accessTokenExpiry,
-      refreshTokenId: refreshTokenId,
-      refreshTokenExpiry: refreshTokenExpiry,
+      userId,
+      accessTokenId,
+      accessTokenExpiry,
+      refreshTokenId,
+      refreshTokenExpiry,
     },
     select: {
       sessionId: true,
@@ -73,13 +69,19 @@ export const upsertSession = async (data: Omit<SessionModel, 'sessionId' | 'upda
 /**
  * find user session by userId & access token id
  */
-export const findUserSessionByAccessTokenId = async (accessTokenId: string, userId: string) => {
+export const findUserSessionByAccessTokenId = async (
+  accessTokenId: string,
+  userId: string,
+) => {
   return await prisma.session.findFirst({ where: { accessTokenId, userId } });
 };
 
 /**
  * find user session by userId & refresh token id
  */
-export const findUserSessionByRefreshTokenId = async (refreshTokenId: string, userId: string) => {
+export const findUserSessionByRefreshTokenId = async (
+  refreshTokenId: string,
+  userId: string,
+) => {
   return await prisma.session.findFirst({ where: { refreshTokenId, userId } });
 };

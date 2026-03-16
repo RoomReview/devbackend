@@ -96,22 +96,16 @@ describe('helpers', () => {
 
   describe('isValidPostcode', () => {
     const valid = [
-      'SW1A 1AA',   // Buckingham Palace
-      'EC1A 1BB',   // London EC1
-      'W1A 0AX',    // Oxford Street
-      'M1 1AE',     // Manchester
-      'B1 1BB',     // Birmingham
-      'sw1a 1aa',   // case-insensitive lower
-      'ZZ9 9ZZ',    // matches the regex pattern (format: AA# #AA)
+      'SW1A 1AA', // Buckingham Palace
+      'EC1A 1BB', // London EC1
+      'W1A 0AX', // Oxford Street
+      'M1 1AE', // Manchester
+      'B1 1BB', // Birmingham
+      'sw1a 1aa', // case-insensitive lower
+      'ZZ9 9ZZ', // matches the regex pattern (format: AA# #AA)
     ];
 
-    const invalid = [
-      '',
-      '1234',
-      'INVALID',
-      'SW1A1AA1',
-      '12345-6789',
-    ];
+    const invalid = ['', '1234', 'INVALID', 'SW1A1AA1', '12345-6789'];
 
     for (const postcode of valid) {
       it(`should return true for valid postcode "${postcode}"`, () => {

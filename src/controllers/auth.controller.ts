@@ -1,5 +1,14 @@
 import type { Request, Response } from 'express';
-import { loginUser, registerUser, logoutUser, resetEmailVerification, verifyEmail, refreshAccessToken, resetPassword as resetPasswordService, forgotPassword as forgotPasswordService } from '@/services/auth.service';
+import {
+  loginUser,
+  registerUser,
+  logoutUser,
+  resetEmailVerification,
+  verifyEmail,
+  refreshAccessToken,
+  resetPassword as resetPasswordService,
+  forgotPassword as forgotPasswordService,
+} from '@/services/auth.service';
 import { ApiResponse } from '@/types';
 import logger, { LogContext } from '@/utils/logger';
 import { VerifyEmailCodeDto } from '@/dto/auth.dto';
@@ -50,10 +59,12 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
       success: session ? true : false,
       statusCode: session ? 200 : 401,
       message: session ? 'User logged in successfully' : 'Invalid credentials',
-      data: session ? {
-        user,
-        session,
-      } : undefined,
+      data: session
+        ? {
+            user,
+            session,
+          }
+        : undefined,
     };
     return res.status(resultant.statusCode).json(resultant);
   } catch (error) {
@@ -108,8 +119,8 @@ export const emailVerify = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    console.log('entered here', req.query)
-    const { user } = await verifyEmail((req?.query as VerifyEmailCodeDto));
+    console.log('entered here', req.query);
+    const { user } = await verifyEmail(req?.query as VerifyEmailCodeDto);
     const resultant: ApiResponse<{ user: typeof user }> = {
       success: true,
       statusCode: 200,
@@ -129,9 +140,18 @@ export const refresh = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { userId, refreshToken } = req.body as { userId: string; refreshToken: string };
-    const { accessToken, expiresAt } = await refreshAccessToken(userId, refreshToken);
-    const resultant: ApiResponse<{ accessToken: string; expiresAt: Date | undefined }> = {
+    const { userId, refreshToken } = req.body as {
+      userId: string;
+      refreshToken: string;
+    };
+    const { accessToken, expiresAt } = await refreshAccessToken(
+      userId,
+      refreshToken,
+    );
+    const resultant: ApiResponse<{
+      accessToken: string;
+      expiresAt: Date | undefined;
+    }> = {
       success: true,
       statusCode: 200,
       message: 'Access token refreshed successfully',

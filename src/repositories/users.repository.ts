@@ -9,7 +9,10 @@ export const findUserByEmail = async (email: string, select?: UserSelect) => {
   return await prisma.user.findUnique({ where: { email }, select });
 };
 
-export const findUserByVerifyCodeHash = async (email: string, hashedCode: string) => {
+export const findUserByVerifyCodeHash = async (
+  email: string,
+  hashedCode: string,
+) => {
   return await prisma.user.findFirst({
     where: { verifyCodeHash: hashedCode, email },
     select: {
@@ -55,7 +58,7 @@ export const verifyUserEmail = async (email: string) => {
   });
 };
 
-export const findAllUsers = async (limit:number, offset:number) => {
+export const findAllUsers = async (limit: number, offset: number) => {
   return await prisma.user.findMany({
     take: limit,
     skip: offset,
@@ -76,20 +79,26 @@ export const findUserById = async (userId: string, select?: UserSelect) => {
   return await prisma.user.findUnique({ where: { userId }, select });
 };
 
-export const updateUserPassword = async (userId: string, passwordHash: string) => {
+export const updateUserPassword = async (
+  userId: string,
+  passwordHash: string,
+) => {
   return await prisma.user.update({
     where: { userId },
     data: { passwordHash },
   });
 };
 
-export const updateUserPasswordAndClearCode = async (userId: string, passwordHash: string) => {
+export const updateUserPasswordAndClearCode = async (
+  userId: string,
+  passwordHash: string,
+) => {
   return await prisma.user.update({
     where: { userId },
-    data: { 
+    data: {
       passwordHash,
       verifyCodeHash: null,
-      verifyCodeExpiry: null
+      verifyCodeExpiry: null,
     },
   });
 };

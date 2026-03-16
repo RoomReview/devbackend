@@ -1,6 +1,13 @@
-
 import { UserRole } from '@/generated/prisma/enums';
-import { object, string, enum as enum_, regexes, email, type infer as _infer, uuid } from 'zod';
+import {
+  object,
+  string,
+  enum as enum_,
+  regexes,
+  email,
+  type infer as _infer,
+  uuid,
+} from 'zod';
 
 export const RegisterUserDto = object({
   email: email({ pattern: regexes.email }),
@@ -20,7 +27,7 @@ export const LoginUserDto = object({
 export type LoginUserDto = _infer<typeof LoginUserDto>;
 
 export const LogoutUserDto = object({
-  userId: uuid()
+  userId: uuid(),
 });
 
 export type LogoutUserDto = _infer<typeof LogoutUserDto>;

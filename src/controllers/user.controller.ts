@@ -1,4 +1,7 @@
-import { findAllUsers, changePassword as changePasswordService } from '@/services/user.service';
+import {
+  findAllUsers,
+  changePassword as changePasswordService,
+} from '@/services/user.service';
 import { ApiResponse } from '@/types';
 import type { Request, Response } from 'express';
 
@@ -8,7 +11,10 @@ export const getAllUsers = async (
 ): Promise<void> => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const { users } = await findAllUsers({ page: Number(page), limit: Number(limit) });
+    const { users } = await findAllUsers({
+      page: Number(page),
+      limit: Number(limit),
+    });
     const resultant: ApiResponse<{ users: typeof users }> = {
       message: 'Get all users',
       data: { users },

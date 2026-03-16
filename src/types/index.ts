@@ -39,7 +39,7 @@ export interface ApiResponse<T = unknown> {
 export interface ValidateRequestMiddlewareArgs<
   TBody = unknown,
   TParams = unknown,
-  TQuery = unknown
+  TQuery = unknown,
 > {
   body?: ZodType<TBody>;
   params?: ZodType<TParams>;
