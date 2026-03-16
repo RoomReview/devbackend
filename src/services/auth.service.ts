@@ -4,14 +4,14 @@ import {
   findUserByEmail,
   getUserSensitiveByEmail,
 } from './user.service';
-import { comparePassword, hashPassword } from './password.service';
-import { generateVerificationCode, verifyCode, isCodeExpired } from './token.service';
+import { comparePassword, hashPassword } from '../utils/password';
+import { generateVerificationCode, verifyCode, isCodeExpired } from '../utils/token';
 import {
   findUserSessionByAccessTokenId,
   logoutSessionByUserId,
   upsertSession,
 } from '@/repositories/sessions.repository';
-import { generateAccessToken, generateRefreshToken, verifyAccessToken } from './jwt.token.service';
+import { generateAccessToken, generateRefreshToken, verifyAccessToken } from '../utils/jwt.token';
 import logger, { LogContext } from '@/utils/logger';
 import { EntityNotFoundError, UnauthorizedError, ValidationError } from '@utils/custom-error';
 import {

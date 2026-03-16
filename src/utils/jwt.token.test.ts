@@ -7,8 +7,8 @@ import {
   verifyRefreshToken,
   generateToken,
   verifyToken,
-} from './jwt.token.service.ts';
-import { UnauthorizedError } from '../utils/custom-error.ts';
+} from './jwt.token.ts';
+import { UnauthorizedError } from './custom-error.ts';
 import { config } from '../config/index.ts';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────

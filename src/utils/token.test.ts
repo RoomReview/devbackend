@@ -1,10 +1,10 @@
 import { equal, ok } from 'node:assert';
 import { describe, it } from 'node:test';
 import {
-    generateVerificationCode,
-    isCodeExpired,
-    verifyCode,
-} from './token.service';
+  generateVerificationCode,
+  isCodeExpired,
+  verifyCode,
+} from './token';
 
 describe('token.service', () => {
   describe('generateVerificationCode', () => {
@@ -32,7 +32,7 @@ describe('token.service', () => {
       const actualExpiration = result.expiresAt.getTime() - before;
       ok(
         actualExpiration >= expectedExpiration - 100 &&
-          actualExpiration <= expectedExpiration + 100,
+        actualExpiration <= expectedExpiration + 100,
       );
     });
   });
