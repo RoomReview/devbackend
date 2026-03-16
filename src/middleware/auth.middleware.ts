@@ -2,8 +2,9 @@ import { permissions } from '@/config/permissions';
 import { validateAccessToken } from '@/services/auth.service';
 import type { AuthenticatedRequest } from '@/types';
 import { UnauthorizedError } from '@/utils/custom-error';
-import type { NextFunction, Request, Response } from 'express';
-import { verifyRefreshToken } from '@/utils/jwt.token';
+import type { NextFunction, Response } from 'express';
+
+
 
 export const authenticate = async (
   req: AuthenticatedRequest,
@@ -41,23 +42,40 @@ export const authorize = (...pems: (keyof typeof permissions)[]) => {
 };
 
 /**
- * Middleware for the refresh endpoint.
- * Decodes the refresh token from req.body and confirms its `sub` claim
- * matches req.body.userId. Must run after validateRequest so the body
- * is already parsed and typed.
+ * Middleware to ensure the authenticated user ID matches the requested user ID.
+ * It searches the request object sequentially using the provided keys
+ * (e.g., ['params.userId', 'body.userId', 'query.userId']).
  */
-export const requireBodyUserMatch = (
-  req: Request,
-  _res: Response,
-  next: NextFunction,
-): void => {
-  const { userId, refreshToken } = req.body as { userId: string; refreshToken: string };
+export const requireMatchingUser = (keys: string[]) => {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction): void => {
+    if (!req.user || !req.user.userId) {
+      throw new UnauthorizedError({ message: 'User authorization required' });
+    }
 
-  const decoded = verifyRefreshToken(refreshToken);
+    const { userId: authenticatedUserId } = req.user;
+    let requestUserId: string | undefined;
 
-  if (decoded.sub !== userId) {
-    throw new UnauthorizedError({ message: 'Token does not match the provided userId' });
-  }
+    for (const key of keys) {
+      const parts = key.split('.');
+      let current: any = req;
+      for (const part of parts) {
+        if (current === undefined || current === null) break;
+        current = current[part];
+      }
+      if (typeof current === 'string') {
+        requestUserId = current;
+        break;
+      }
+    }
 
-  next();
+    if (!requestUserId) {
+      throw new UnauthorizedError({ message: 'No userId found in request using provided keys' });
+    }
+
+    if (authenticatedUserId !== requestUserId) {
+      throw new UnauthorizedError({ message: 'Authenticated user does not match the requested userId' });
+    }
+
+    next();
+  };
 };
