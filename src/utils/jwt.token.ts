@@ -81,7 +81,7 @@ export const verifyToken = (
     return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      logger.info(logContext, 'JWT token expired', { error });
+      logger.warn(logContext, 'JWT token expired', { error: error.message });
       throw new UnauthorizedError({
         message: 'Token has expired',
         code: ErrorCodes.VALIDATION_ERROR,
@@ -90,7 +90,7 @@ export const verifyToken = (
     }
 
     if (error instanceof jwt.JsonWebTokenError) {
-      logger.info(logContext, 'JWT token invalid', { error });
+      logger.warn(logContext, 'JWT token invalid', { error: error.message });
       throw new UnauthorizedError({
         message: 'Invalid token',
         code: ErrorCodes.VALIDATION_ERROR,
