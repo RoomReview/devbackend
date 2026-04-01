@@ -61,4 +61,10 @@ router.post(
   authController.resetPassword,
 );
 
+router.get(
+  '/me',
+  authenticate,
+  authController.getMe,
+)
+
 export default router;

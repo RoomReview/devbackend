@@ -1,12 +1,26 @@
 import { UserSelect, UserCreateInput } from '@/generated/prisma/models';
+import logger, { LogContext } from '@/utils/logger';
 import prisma from '@config/database';
 
+const logContext: LogContext = {
+  service: 'UserRepository',
+  function: '',
+};
+
 export const createUser = async (user: UserCreateInput) => {
-  return await prisma.user.create({ data: user });
+  return await prisma.user.create({ data: user }).catch(err => {
+    logContext.function = 'createUser';
+    logger.error(logContext, 'Error in createUser repository', { error: err });
+    throw new Error('DB: user create operation failed');
+  });
 };
 
 export const findUserByEmail = async (email: string, select?: UserSelect) => {
-  return await prisma.user.findUnique({ where: { email }, select });
+  return await prisma.user.findUnique({ where: { email }, select }).catch(err => {
+    logContext.function = 'findUserByEmail';
+    logger.error(logContext, 'Error in findUserByEmail repository', { error: err });
+    throw new Error('DB: findUserByEmail operation failed');
+  });
 };
 
 export const findUserByVerifyCodeHash = async (
@@ -22,6 +36,10 @@ export const findUserByVerifyCodeHash = async (
       verifyCodeHash: true,
       verifyCodeExpiry: true,
     },
+  }).catch(err => {
+    logContext.function = 'findUserByVerifyCodeHash';
+    logger.error(logContext, 'Error in findUserByVerifyCodeHash repository', { error: err });
+    throw new Error('DB: findUserByVerifyCodeHash operation failed');
   });
 };
 
@@ -34,6 +52,10 @@ export const updateUserVerifyCode = async (
     where: { email },
     data: { verifyCodeHash, verifyCodeExpiry },
     select: { userId: true, email: true, isEmailVerified: true },
+  }).catch(err => {
+    logContext.function = 'updateUserVerifyCode';
+    logger.error(logContext, 'Error in updateUserVerifyCode repository', { error: err });
+    throw new Error('DB: updateUserVerifyCode operation failed');
   });
 };
 
@@ -55,6 +77,10 @@ export const verifyUserEmail = async (email: string) => {
       verifiedAt: true,
       role: true,
     },
+  }).catch(err => {
+    logContext.function = 'verifyUserEmail';
+    logger.error(logContext, 'Error in verifyUserEmail repository', { error: err });
+    throw new Error('DB: verifyUserEmail operation failed');
   });
 };
 
@@ -72,11 +98,19 @@ export const findAllUsers = async (limit: number, offset: number) => {
       role: true,
       createdAt: true,
     },
+  }).catch(err => {
+    logContext.function = 'findAllUsers';
+    logger.error(logContext, 'Error in findAllUsers repository', { error: err });
+    throw new Error('DB: findAllUsers operation failed');
   });
 };
 
 export const findUserById = async (userId: string, select?: UserSelect) => {
-  return await prisma.user.findUnique({ where: { userId }, select });
+  return await prisma.user.findUnique({ where: { userId }, select }).catch(err => {
+    logContext.function = 'findUserById';
+    logger.error(logContext, 'Error in findUserById repository', { error: err });
+    throw new Error('DB: findUserById operation failed');
+  });
 };
 
 export const updateUserPassword = async (
@@ -86,6 +120,10 @@ export const updateUserPassword = async (
   return await prisma.user.update({
     where: { userId },
     data: { passwordHash },
+  }).catch(err => {
+    logContext.function = 'updateUserPassword';
+    logger.error(logContext, 'Error in updateUserPassword repository', { error: err });
+    throw new Error('DB: updateUserPassword operation failed');
   });
 };
 
@@ -100,5 +138,9 @@ export const updateUserPasswordAndClearCode = async (
       verifyCodeHash: null,
       verifyCodeExpiry: null,
     },
+  }).catch(err => {
+    logContext.function = 'updateUserPasswordAndClearCode';
+    logger.error(logContext, 'Error in updateUserPasswordAndClearCode repository', { error: err });
+    throw new Error('DB: updateUserPasswordAndClearCode operation failed');
   });
 };

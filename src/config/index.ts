@@ -22,6 +22,24 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   saltKeyLength: 16,
   passwordHashLength: 64,
+  // Email - Provider (Sendgrid)
+  sendGridApiKey: process.env.SENDGRID_API_KEY ?? '',
+  emailFrom: process.env.EMAIL_FROM ?? '',
+  sendGridSandboxMode: process.env.SENDGRID_SANDBOX_MODE === 'false' ? false : true,
+  sendGridDataResidence: 'eu',
+  sendVerifyEmailCodeV1TemplateId: 'd-2495bae5bdb84fa1b2afc8c4dacb0e59',
+  sendResetPasswordCodeV1TemplateId: 'd-56e1f0eb30c34b7fb20ca9e21bab30a1',
+  sendGridTemplateParameters: {
+    'd-2495bae5bdb84fa1b2afc8c4dacb0e59': {
+      name: 'Customer',
+      code: '######',
+      contact_button_link: process.env.ROOMREVIEW_CONTACT_LINK ?? '/',
+    },
+    'd-56e1f0eb30c34b7fb20ca9e21bab30a1': {
+      contact_button_link: process.env.ROOMREVIEW_CONTACT_LINK ?? '/',
+      reset_pswd_button_link: process.env.ROOMREVIEW_RESET_PASSWORD_LINK ?? '/',
+    }
+  }
 } as const;
 
 export default config;

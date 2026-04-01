@@ -40,6 +40,8 @@ import {
   updateUserVerifyCode,
   verifyUserEmail as verifyUserEmailRepo,
 } from '@/repositories/users.repository';
+import { sendResetPasswordEmail, sendVerificationEmail } from '@/utils/email';
+import config from '@/config';
 
 const logContext: LogContext = {
   service: 'auth.service',
@@ -50,7 +52,6 @@ export const registerUser = async (data: RegisterUserDto) => {
   logContext.function = 'registerUser';
   // is user already exist
   const existingUser = await findUserByEmail(data.email);
-  console.log('existingUser', existingUser);
   if (existingUser) {
     return { user: existingUser, session: {}, isExistingUser: true };
   }
@@ -62,6 +63,9 @@ export const registerUser = async (data: RegisterUserDto) => {
   const token = generateVerificationCode();
 
   logger.info(logContext, 'Verification token generated', { token });
+
+  // TODO: send the verification email with code
+  await sendVerificationEmail(data.email, token.code, `${data.firstName} ${data.lastName}`);
 
   // create user
   const user = await createUser({
@@ -75,7 +79,6 @@ export const registerUser = async (data: RegisterUserDto) => {
     isActive: true,
   });
 
-  // TODO: send the verification email with code
 
   // TBD: create session (Why register api return session(access&refresh tokens) without email verified)
 
@@ -184,13 +187,17 @@ export const forgotPassword = async (email: string) => {
   }
 
   const token = generateVerificationCode();
+  const resetPasswordLink = config.sendGridTemplateParameters[config.sendResetPasswordCodeV1TemplateId].reset_pswd_button_link;
+  const resetPasswordUrl = `${resetPasswordLink}?token=${token.code}&email=${email}`;
 
+  await sendResetPasswordEmail(email, user.firstName + ' ' + user.lastName, resetPasswordUrl);
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
 
   // TODO: Send password reset email with the 6-digit code `token.code`
   logger.info(logContext, 'Password reset code generated — dev-only log', {
     email,
     code: token.code,
+    resetPasswordUrl,
   });
 
   return { isEmailSent: true };
