@@ -118,7 +118,6 @@ export const emailVerify = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    console.log('entered here', req.query);
     const { user } = await verifyEmail(req?.query as VerifyEmailCodeDto);
     const resultant: ApiResponse<{ user: typeof user }> = {
       success: true,

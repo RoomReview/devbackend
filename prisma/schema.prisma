@@ -18,13 +18,15 @@ model User {
   email            String    @unique
   firstName        String    @map("first_name")
   lastName         String    @map("last_name")
-  passwordHash     String    @map("password_hash")
+  passwordHash     String?   @map("password_hash")
   isEmailVerified  Boolean   @default(false) @map("is_email_verified")
   isActive         Boolean   @default(true) @map("is_active")
   role             UserRole  @default(TENANT)
   verifyCodeHash   String?   @map("verify_code_hash")
   verifiedAt       DateTime? @map("verified_at")
   verifyCodeExpiry DateTime? @map("verify_code_expiry")
+  googleId         String?   @unique @map("google_id")
+  facebookId       String?   @unique @map("facebook_id")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 

@@ -12,6 +12,7 @@ import { errorHandler, notFoundHandler } from '@middleware/error.middleware';
 import { assignRequestId } from '@middleware/request-id.middleware.js';
 import { getCustomMorganFormat } from '@middleware/request-logger.middleware';
 import routes from './routes';
+import { configurePassport } from '@utils/sso.login';
 
 dotenv.config();
 
@@ -25,6 +26,9 @@ app.use(cors());
 app.use(morgan(getCustomMorganFormat));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Passport SSO (session-less — must come after body parsers)
+configurePassport(app);
 
 // Routes
 app.use('/api/v1', routes);
