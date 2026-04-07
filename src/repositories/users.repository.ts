@@ -144,3 +144,93 @@ export const updateUserPasswordAndClearCode = async (
     throw new Error('DB: updateUserPasswordAndClearCode operation failed');
   });
 };
+
+export const findUserByGoogleId = async (googleId: string) => {
+  return await prisma.user.findUnique({
+    where: { googleId },
+    select: {
+      userId: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      isEmailVerified: true,
+      isActive: true,
+      googleId: true,
+      facebookId: true,
+    },
+  }).catch(err => {
+    logContext.function = 'findUserByGoogleId';
+    logger.error(logContext, 'Error in findUserByGoogleId repository', { error: err });
+    throw new Error('DB: findUserByGoogleId operation failed');
+  });
+};
+
+export const findUserByFacebookId = async (facebookId: string) => {
+  return await prisma.user.findUnique({
+    where: { facebookId },
+    select: {
+      userId: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      isEmailVerified: true,
+      isActive: true,
+      googleId: true,
+      facebookId: true,
+    },
+  }).catch(err => {
+    logContext.function = 'findUserByFacebookId';
+    logger.error(logContext, 'Error in findUserByFacebookId repository', { error: err });
+    throw new Error('DB: findUserByFacebookId operation failed');
+  });
+};
+
+export type SsoUpsertInput = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  googleId?: string;
+  facebookId?: string;
+};
+
+/**
+ * Creates a new SSO user or, if the email already exists, links the SSO identity
+ * onto the existing account (auto-link strategy).
+ */
+export const upsertSsoUser = async (data: SsoUpsertInput) => {
+  const { email, firstName, lastName, googleId, facebookId } = data;
+  return await prisma.user.upsert({
+    where: { email },
+    create: {
+      email,
+      firstName,
+      lastName,
+      isEmailVerified: true,
+      isActive: true,
+      googleId: googleId ?? null,
+      facebookId: facebookId ?? null,
+    },
+    update: {
+      ...(googleId ? { googleId } : {}),
+      ...(facebookId ? { facebookId } : {}),
+    },
+    select: {
+      userId: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      isEmailVerified: true,
+      isActive: true,
+      googleId: true,
+      facebookId: true,
+    },
+  }).catch(err => {
+    logContext.function = 'upsertSsoUser';
+    logger.error(logContext, 'Error in upsertSsoUser repository', { error: err });
+    throw new Error('DB: upsertSsoUser operation failed');
+  });
+};
+

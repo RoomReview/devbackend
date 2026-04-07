@@ -39,6 +39,9 @@ import {
   findUserByVerifyCodeHash,
   updateUserVerifyCode,
   verifyUserEmail as verifyUserEmailRepo,
+  findUserByGoogleId,
+  findUserByFacebookId,
+  upsertSsoUser,
 } from '@/repositories/users.repository';
 import { sendResetPasswordEmail, sendVerificationEmail } from '@/utils/email';
 import config from '@/config';
@@ -97,7 +100,7 @@ export const loginUser = async (email: string, password: string) => {
     return { user: userWithoutPassword, session: null };
   }
 
-  if (!(await comparePassword(password, user.passwordHash))) {
+  if (!(await comparePassword(password, user?.passwordHash ?? ''))) {
     throw new UnauthorizedError({
       message: 'Invalid credentials',
       code: 'VALIDATION_ERROR',
@@ -351,3 +354,87 @@ export const refreshAccessToken = async (
     expiresAt: accessTokenObj.expiresAt,
   };
 };
+
+// ---------------------------------------------------------------------------
+// SSO helpers
+// ---------------------------------------------------------------------------
+
+export type SsoProvider = 'google' | 'facebook';
+
+export interface SsoProfile {
+  provider: SsoProvider;
+  /** Provider's own subject ID */
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+/**
+ * Logs in an existing user or registers a new one via an SSO provider.
+ * Lookup order:
+ *   1. Find by provider-specific ID (googleId / facebookId)
+ *   2. Auto-link: find by email and attach SSO identity
+ *   3. Create brand-new SSO-only user
+ * In all cases a JWT session is upserted and returned.
+ */
+export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
+  logContext.function = 'loginOrRegisterSsoUser';
+  const { provider, id, email, firstName, lastName } = profile;
+
+  // 1. Try provider-specific lookup
+  const byId =
+    provider === 'google'
+      ? await findUserByGoogleId(id)
+      : await findUserByFacebookId(id);
+
+  // 2. Auto-link by email (or create new) via upsert
+  const user =
+    byId ??
+    (await upsertSsoUser({
+      email,
+      firstName,
+      lastName,
+      googleId: provider === 'google' ? id : undefined,
+      facebookId: provider === 'facebook' ? id : undefined,
+    }));
+
+  if (!user.isActive) {
+    throw new ValidationError({
+      message: 'Account is deactivated',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  const accessTokenObj = generateAccessToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
+
+  const refreshTokenObj = generateRefreshToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
+
+  const currentSession = await upsertSession({
+    userId: user.userId,
+    accessTokenId: accessTokenObj?.jti ?? null,
+    refreshTokenId: refreshTokenObj?.jti ?? null,
+    accessTokenExpiry: accessTokenObj.expiresAt ?? null,
+    refreshTokenExpiry: refreshTokenObj.expiresAt ?? null,
+  });
+
+  logger.info(logContext, 'SSO login successful', { provider, userId: user.userId });
+
+  return {
+    user,
+    session: {
+      ...currentSession,
+      accessToken: accessTokenObj.token,
+      refreshToken: refreshTokenObj.token,
+    },
+  };
+};
+
