@@ -39,7 +39,12 @@ import {
   findUserByVerifyCodeHash,
   updateUserVerifyCode,
   verifyUserEmail as verifyUserEmailRepo,
+  findUserByGoogleId,
+  findUserByFacebookId,
+  upsertSsoUser,
 } from '@/repositories/users.repository';
+import { sendResetPasswordEmail, sendVerificationEmail } from '@/utils/email';
+import config from '@/config';
 
 const logContext: LogContext = {
   service: 'auth.service',
@@ -50,7 +55,6 @@ export const registerUser = async (data: RegisterUserDto) => {
   logContext.function = 'registerUser';
   // is user already exist
   const existingUser = await findUserByEmail(data.email);
-  console.log('existingUser', existingUser);
   if (existingUser) {
     return { user: existingUser, session: {}, isExistingUser: true };
   }
@@ -62,6 +66,9 @@ export const registerUser = async (data: RegisterUserDto) => {
   const token = generateVerificationCode();
 
   logger.info(logContext, 'Verification token generated', { token });
+
+  // TODO: send the verification email with code
+  await sendVerificationEmail(data.email, token.code, `${data.firstName} ${data.lastName}`);
 
   // create user
   const user = await createUser({
@@ -75,7 +82,6 @@ export const registerUser = async (data: RegisterUserDto) => {
     isActive: true,
   });
 
-  // TODO: send the verification email with code
 
   // TBD: create session (Why register api return session(access&refresh tokens) without email verified)
 
@@ -94,7 +100,7 @@ export const loginUser = async (email: string, password: string) => {
     return { user: userWithoutPassword, session: null };
   }
 
-  if (!(await comparePassword(password, user.passwordHash))) {
+  if (!(await comparePassword(password, user?.passwordHash ?? ''))) {
     throw new UnauthorizedError({
       message: 'Invalid credentials',
       code: 'VALIDATION_ERROR',
@@ -184,13 +190,17 @@ export const forgotPassword = async (email: string) => {
   }
 
   const token = generateVerificationCode();
+  const resetPasswordLink = config.sendGridTemplateParameters[config.sendResetPasswordCodeV1TemplateId].reset_pswd_button_link;
+  const resetPasswordUrl = `${resetPasswordLink}?token=${token.code}&email=${email}`;
 
+  await sendResetPasswordEmail(email, user.firstName + ' ' + user.lastName, resetPasswordUrl);
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
 
   // TODO: Send password reset email with the 6-digit code `token.code`
   logger.info(logContext, 'Password reset code generated — dev-only log', {
     email,
     code: token.code,
+    resetPasswordUrl,
   });
 
   return { isEmailSent: true };
@@ -344,3 +354,87 @@ export const refreshAccessToken = async (
     expiresAt: accessTokenObj.expiresAt,
   };
 };
+
+// ---------------------------------------------------------------------------
+// SSO helpers
+// ---------------------------------------------------------------------------
+
+export type SsoProvider = 'google' | 'facebook';
+
+export interface SsoProfile {
+  provider: SsoProvider;
+  /** Provider's own subject ID */
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+/**
+ * Logs in an existing user or registers a new one via an SSO provider.
+ * Lookup order:
+ *   1. Find by provider-specific ID (googleId / facebookId)
+ *   2. Auto-link: find by email and attach SSO identity
+ *   3. Create brand-new SSO-only user
+ * In all cases a JWT session is upserted and returned.
+ */
+export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
+  logContext.function = 'loginOrRegisterSsoUser';
+  const { provider, id, email, firstName, lastName } = profile;
+
+  // 1. Try provider-specific lookup
+  const byId =
+    provider === 'google'
+      ? await findUserByGoogleId(id)
+      : await findUserByFacebookId(id);
+
+  // 2. Auto-link by email (or create new) via upsert
+  const user =
+    byId ??
+    (await upsertSsoUser({
+      email,
+      firstName,
+      lastName,
+      googleId: provider === 'google' ? id : undefined,
+      facebookId: provider === 'facebook' ? id : undefined,
+    }));
+
+  if (!user.isActive) {
+    throw new ValidationError({
+      message: 'Account is deactivated',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  const accessTokenObj = generateAccessToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
+
+  const refreshTokenObj = generateRefreshToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
+
+  const currentSession = await upsertSession({
+    userId: user.userId,
+    accessTokenId: accessTokenObj?.jti ?? null,
+    refreshTokenId: refreshTokenObj?.jti ?? null,
+    accessTokenExpiry: accessTokenObj.expiresAt ?? null,
+    refreshTokenExpiry: refreshTokenObj.expiresAt ?? null,
+  });
+
+  logger.info(logContext, 'SSO login successful', { provider, userId: user.userId });
+
+  return {
+    user,
+    session: {
+      ...currentSession,
+      accessToken: accessTokenObj.token,
+      refreshToken: refreshTokenObj.token,
+    },
+  };
+};
+

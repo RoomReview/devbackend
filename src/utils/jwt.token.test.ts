@@ -202,7 +202,7 @@ describe('jwt.token.service', () => {
     it('should produce a token distinct from the access token for the same payload', () => {
       ok(
         generateAccessToken(validPayload) !==
-          generateRefreshToken(validPayload),
+        generateRefreshToken(validPayload),
       );
     });
   });

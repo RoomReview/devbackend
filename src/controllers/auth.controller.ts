@@ -9,7 +9,7 @@ import {
   resetPassword as resetPasswordService,
   forgotPassword as forgotPasswordService,
 } from '@/services/auth.service';
-import { ApiResponse } from '@/types';
+import { ApiResponse, AuthenticatedRequest } from '@/types';
 import logger, { LogContext } from '@/utils/logger';
 import { VerifyEmailCodeDto } from '@/dto/auth.dto';
 
@@ -23,7 +23,6 @@ export const register = async (
 ): Promise<Response> => {
   try {
     const { user, session, isExistingUser } = await registerUser(req.body);
-    console.log('user', user, isExistingUser);
     const resultant: ApiResponse<{
       user: typeof user;
       session: typeof session;
@@ -61,9 +60,9 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
       message: session ? 'User logged in successfully' : 'Invalid credentials',
       data: session
         ? {
-            user,
-            session,
-          }
+          user,
+          session,
+        }
         : undefined,
     };
     return res.status(resultant.statusCode).json(resultant);
@@ -119,7 +118,6 @@ export const emailVerify = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    console.log('entered here', req.query);
     const { user } = await verifyEmail(req?.query as VerifyEmailCodeDto);
     const resultant: ApiResponse<{ user: typeof user }> = {
       success: true,
@@ -203,6 +201,28 @@ export const forgotPassword = async (
   } catch (error) {
     logContext.function = 'forgotPassword';
     logger.error(logContext, 'Error in forgotPassword controller', { error });
+    throw error;
+  }
+};
+
+export const getMe = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { user } = req;
+    const resultant: ApiResponse<{
+      user: Omit<typeof user, 'accessTokenId'>;
+    }> = {
+      success: true,
+      statusCode: 200,
+      message: 'User fetched successfully',
+      data: { user: { ...user, accessTokenId: undefined } },
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'getMe';
+    logger.error(logContext, 'Error in getMe controller', { error });
     throw error;
   }
 };
