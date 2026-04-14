@@ -20,8 +20,10 @@ export const isValidPostcode = (postcode: string): boolean => {
   return postcodeRegex.test(postcode);
 };
 
-export const paginate = (page: number, limit: number): { offset: number; limit: number } => {
+export const paginate = (
+  page: number,
+  limit: number,
+): { offset: number; limit: number } => {
   const offset = (page - 1) * limit;
   return { offset, limit };
-}
-
+};

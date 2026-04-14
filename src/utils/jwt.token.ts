@@ -12,11 +12,11 @@ import logger, { LogContext } from '@utils/logger';
 
 /** Claims embedded into every signed JWT. */
 export interface JwtPayload {
-  sub: string;    // userId (RFC 7519 subject)
+  sub: string; // userId (RFC 7519 subject)
   email: string;
   role: string;
-  jti?: string;   // unique token ID  (RFC 7519 JWT ID)
-  iss?: string;   // issuer           (RFC 7519 issuer)
+  jti?: string; // unique token ID  (RFC 7519 JWT ID)
+  iss?: string; // issuer           (RFC 7519 issuer)
   aud?: string | string[]; // audience (RFC 7519 audience)
   iat?: number;
   exp?: number;
@@ -77,11 +77,14 @@ export const verifyToken = (
 
   try {
     const decoded = jwt.verify(token, secret, options) as JwtPayload;
-    logger.info(logContext, 'JWT token verified', { sub: decoded.sub, jti: decoded.jti });
+    logger.info(logContext, 'JWT token verified', {
+      sub: decoded.sub,
+      jti: decoded.jti,
+    });
     return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      logger.info(logContext, 'JWT token expired', { error });
+      logger.warn(logContext, 'JWT token expired', { error: error.message });
       throw new UnauthorizedError({
         message: 'Token has expired',
         code: ErrorCodes.VALIDATION_ERROR,
@@ -90,7 +93,7 @@ export const verifyToken = (
     }
 
     if (error instanceof jwt.JsonWebTokenError) {
-      logger.info(logContext, 'JWT token invalid', { error });
+      logger.warn(logContext, 'JWT token invalid', { error: error.message });
       throw new UnauthorizedError({
         message: 'Invalid token',
         code: ErrorCodes.VALIDATION_ERROR,
@@ -98,7 +101,9 @@ export const verifyToken = (
       });
     }
 
-    logger.error(logContext, 'Unexpected error during JWT verification', { error });
+    logger.error(logContext, 'Unexpected error during JWT verification', {
+      error,
+    });
     throw new InternalServerError({
       message: 'Token verification failed',
       code: ErrorCodes.INTERNAL_SERVER_ERROR,
@@ -122,7 +127,7 @@ export const generateAccessToken = (payload: TokenInput) => {
   logger.info(logContext, 'Generating access token', { sub: payload.sub });
 
   return generateToken(payload, config.jwtSecret, {
-    expiresIn: (config.jwtExpiresIn as SignOptions['expiresIn']),
+    expiresIn: config.jwtExpiresIn as SignOptions['expiresIn'],
     jwtid: crypto.randomUUID(),
     issuer: config.jwtIssuer,
     audience: config.jwtAccessTokenAudience,

@@ -16,7 +16,7 @@ class CustomError<C extends string> extends Error {
     message,
     statusCode,
     code,
-    data
+    data,
   }: {
     message: string;
     statusCode?: number;
@@ -58,5 +58,5 @@ export {
   ErrorCodes,
   CustomError,
   UnauthorizedError,
-  ForbiddenError
+  ForbiddenError,
 };

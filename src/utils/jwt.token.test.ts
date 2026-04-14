@@ -7,8 +7,8 @@ import {
   verifyRefreshToken,
   generateToken,
   verifyToken,
-} from './jwt.token.service.ts';
-import { UnauthorizedError } from '../utils/custom-error.ts';
+} from './jwt.token.ts';
+import { UnauthorizedError } from './custom-error.ts';
 import { config } from '../config/index.ts';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -50,7 +50,10 @@ describe('jwt.token.service', () => {
       const decoded = verifyAccessToken(token.token);
       ok(typeof decoded.jti === 'string' && decoded.jti.length > 0);
       // UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-      match(decoded.jti!, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      match(
+        decoded.jti!,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
     });
 
     it('should generate a unique jti for each call', () => {
@@ -60,12 +63,16 @@ describe('jwt.token.service', () => {
     });
 
     it('should embed the correct issuer (iss)', () => {
-      const decoded = verifyAccessToken(generateAccessToken(validPayload).token);
+      const decoded = verifyAccessToken(
+        generateAccessToken(validPayload).token,
+      );
       equal(decoded.iss, config.jwtIssuer);
     });
 
     it('should embed the access-token audience (aud)', () => {
-      const decoded = verifyAccessToken(generateAccessToken(validPayload).token);
+      const decoded = verifyAccessToken(
+        generateAccessToken(validPayload).token,
+      );
       const aud = decoded.aud;
       const expected = config.jwtAccessTokenAudience;
       // jsonwebtoken may return aud as string or string[]
@@ -77,7 +84,9 @@ describe('jwt.token.service', () => {
 
   describe('verifyAccessToken', () => {
     it('should return the decoded payload for a valid access token', () => {
-      const decoded = verifyAccessToken(generateAccessToken(validPayload).token);
+      const decoded = verifyAccessToken(
+        generateAccessToken(validPayload).token,
+      );
       equal(decoded.sub, validPayload.sub);
     });
 
@@ -125,10 +134,11 @@ describe('jwt.token.service', () => {
         audience: config.jwtAccessTokenAudience,
       });
       throws(
-        () => verifyToken(token.token, 'secret-b', {
-          issuer: config.jwtIssuer,
-          audience: config.jwtAccessTokenAudience,
-        }),
+        () =>
+          verifyToken(token.token, 'secret-b', {
+            issuer: config.jwtIssuer,
+            audience: config.jwtAccessTokenAudience,
+          }),
         (err: unknown) => {
           ok(err instanceof UnauthorizedError);
           return true;
@@ -147,16 +157,23 @@ describe('jwt.token.service', () => {
     });
 
     it('should embed sub, email and role in the payload', () => {
-      const decoded = verifyRefreshToken(generateRefreshToken(validPayload).token);
+      const decoded = verifyRefreshToken(
+        generateRefreshToken(validPayload).token,
+      );
       equal(decoded.sub, validPayload.sub);
       equal(decoded.email, validPayload.email);
       equal(decoded.role, validPayload.role);
     });
 
     it('should embed a non-empty jti (UUID v4 format)', () => {
-      const decoded = verifyRefreshToken(generateRefreshToken(validPayload).token);
+      const decoded = verifyRefreshToken(
+        generateRefreshToken(validPayload).token,
+      );
       ok(typeof decoded.jti === 'string' && decoded.jti.length > 0);
-      match(decoded.jti!, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      match(
+        decoded.jti!,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
     });
 
     it('should generate a unique jti for each call', () => {
@@ -166,12 +183,16 @@ describe('jwt.token.service', () => {
     });
 
     it('should embed the correct issuer (iss)', () => {
-      const decoded = verifyRefreshToken(generateRefreshToken(validPayload).token);
+      const decoded = verifyRefreshToken(
+        generateRefreshToken(validPayload).token,
+      );
       equal(decoded.iss, config.jwtIssuer);
     });
 
     it('should embed the refresh-token audience (aud), distinct from access-token audience', () => {
-      const decoded = verifyRefreshToken(generateRefreshToken(validPayload).token);
+      const decoded = verifyRefreshToken(
+        generateRefreshToken(validPayload).token,
+      );
       const aud = decoded.aud;
       const expected = config.jwtRefreshTokenAudience;
       ok(aud === expected || (Array.isArray(aud) && aud.includes(expected)));
@@ -179,7 +200,10 @@ describe('jwt.token.service', () => {
     });
 
     it('should produce a token distinct from the access token for the same payload', () => {
-      ok(generateAccessToken(validPayload) !== generateRefreshToken(validPayload));
+      ok(
+        generateAccessToken(validPayload) !==
+        generateRefreshToken(validPayload),
+      );
     });
   });
 
@@ -187,7 +211,9 @@ describe('jwt.token.service', () => {
 
   describe('verifyRefreshToken', () => {
     it('should return the decoded payload for a valid refresh token', () => {
-      const decoded = verifyRefreshToken(generateRefreshToken(validPayload).token);
+      const decoded = verifyRefreshToken(
+        generateRefreshToken(validPayload).token,
+      );
       equal(decoded.sub, validPayload.sub);
     });
 
@@ -244,13 +270,14 @@ describe('jwt.token.service', () => {
       const tokenForAccess = generateToken(validPayload, sharedSecret, {
         expiresIn: '15m',
         issuer: config.jwtIssuer,
-        audience: config.jwtRefreshTokenAudience,  // ← wrong audience
+        audience: config.jwtRefreshTokenAudience, // ← wrong audience
       });
       throws(
-        () => verifyToken(tokenForAccess.token, sharedSecret, {
-          issuer: config.jwtIssuer,
-          audience: config.jwtAccessTokenAudience,  // ← expected audience
-        }),
+        () =>
+          verifyToken(tokenForAccess.token, sharedSecret, {
+            issuer: config.jwtIssuer,
+            audience: config.jwtAccessTokenAudience, // ← expected audience
+          }),
         (err: unknown) => {
           ok(err instanceof UnauthorizedError);
           return true;
@@ -262,14 +289,15 @@ describe('jwt.token.service', () => {
       const sharedSecret = 'shared-secret';
       const token = generateToken(validPayload, sharedSecret, {
         expiresIn: '15m',
-        issuer: 'malicious-issuer',                 // ← wrong issuer
+        issuer: 'malicious-issuer', // ← wrong issuer
         audience: config.jwtAccessTokenAudience,
       });
       throws(
-        () => verifyToken(token.token, sharedSecret, {
-          issuer: config.jwtIssuer,                 // ← expected issuer
-          audience: config.jwtAccessTokenAudience,
-        }),
+        () =>
+          verifyToken(token.token, sharedSecret, {
+            issuer: config.jwtIssuer, // ← expected issuer
+            audience: config.jwtAccessTokenAudience,
+          }),
         (err: unknown) => {
           ok(err instanceof UnauthorizedError);
           return true;
@@ -278,4 +306,3 @@ describe('jwt.token.service', () => {
     });
   });
 });
-

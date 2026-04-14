@@ -6,6 +6,7 @@ export interface AuthenticatedRequest extends Request {
     userId: string;
     email: string;
     role: string;
+    accessTokenId?: string;
   };
 }
 
@@ -38,7 +39,7 @@ export interface ApiResponse<T = unknown> {
 export interface ValidateRequestMiddlewareArgs<
   TBody = unknown,
   TParams = unknown,
-  TQuery = unknown
+  TQuery = unknown,
 > {
   body?: ZodType<TBody>;
   params?: ZodType<TParams>;

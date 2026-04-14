@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { describe, test } from 'node:test';
-import { comparePassword, hashPassword } from './password.service.ts';
+import { comparePassword, hashPassword } from './password.ts';
 
 describe('password.service', () => {
   test('hashPassword should return a string in the format "salt:hash"', async () => {

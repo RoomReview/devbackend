@@ -1,10 +1,6 @@
 import { equal, ok } from 'node:assert';
 import { describe, it } from 'node:test';
-import {
-    generateVerificationCode,
-    isCodeExpired,
-    verifyCode,
-} from './token.service';
+import { generateVerificationCode, isCodeExpired, verifyCode } from './token';
 
 describe('token.service', () => {
   describe('generateVerificationCode', () => {

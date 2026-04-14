@@ -1,6 +1,15 @@
 import type { Request, Response } from 'express';
-import { loginUser, registerUser, logoutUser, resetEmailVerification, verifyEmail } from '@/services/auth.service';
-import { ApiResponse } from '@/types';
+import {
+  loginUser,
+  registerUser,
+  logoutUser,
+  resetEmailVerification,
+  verifyEmail,
+  refreshAccessToken,
+  resetPassword as resetPasswordService,
+  forgotPassword as forgotPasswordService,
+} from '@/services/auth.service';
+import { ApiResponse, AuthenticatedRequest } from '@/types';
 import logger, { LogContext } from '@/utils/logger';
 import { VerifyEmailCodeDto } from '@/dto/auth.dto';
 
@@ -14,7 +23,6 @@ export const register = async (
 ): Promise<Response> => {
   try {
     const { user, session, isExistingUser } = await registerUser(req.body);
-    console.log('user', user, isExistingUser);
     const resultant: ApiResponse<{
       user: typeof user;
       session: typeof session;
@@ -50,10 +58,12 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
       success: session ? true : false,
       statusCode: session ? 200 : 401,
       message: session ? 'User logged in successfully' : 'Invalid credentials',
-      data: session ? {
-        user,
-        session,
-      } : undefined,
+      data: session
+        ? {
+          user,
+          session,
+        }
+        : undefined,
     };
     return res.status(resultant.statusCode).json(resultant);
   } catch (error) {
@@ -108,8 +118,7 @@ export const emailVerify = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    console.log('entered here', req.query)
-    const { user } = await verifyEmail((req?.query as VerifyEmailCodeDto));
+    const { user } = await verifyEmail(req?.query as VerifyEmailCodeDto);
     const resultant: ApiResponse<{ user: typeof user }> = {
       success: true,
       statusCode: 200,
@@ -120,6 +129,100 @@ export const emailVerify = async (
   } catch (error) {
     logContext.function = 'emailVerify';
     logger.error(logContext, 'Error in emailVerify controller', { error });
+    throw error;
+  }
+};
+
+export const refresh = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { userId, refreshToken } = req.body as {
+      userId: string;
+      refreshToken: string;
+    };
+    const { accessToken, expiresAt } = await refreshAccessToken(
+      userId,
+      refreshToken,
+    );
+    const resultant: ApiResponse<{
+      accessToken: string;
+      expiresAt: Date | undefined;
+    }> = {
+      success: true,
+      statusCode: 200,
+      message: 'Access token refreshed successfully',
+      data: { accessToken, expiresAt },
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'refresh';
+    logger.error(logContext, 'Error in refresh controller', { error });
+    throw error;
+  }
+};
+
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    await resetPasswordService(req.body);
+    const resultant: ApiResponse<null> = {
+      success: true,
+      statusCode: 200,
+      message: 'Password reset successfully',
+      data: null,
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'resetPassword';
+    logger.error(logContext, 'Error in resetPassword controller', { error });
+    throw error;
+  }
+};
+
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { email } = req.body;
+    await forgotPasswordService(email);
+    // Return a generic success to prevent email enumeration
+    const resultant: ApiResponse<null> = {
+      success: true,
+      statusCode: 200,
+      message: 'If the email exists, a password reset code has been sent.',
+      data: null,
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'forgotPassword';
+    logger.error(logContext, 'Error in forgotPassword controller', { error });
+    throw error;
+  }
+};
+
+export const getMe = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { user } = req;
+    const resultant: ApiResponse<{
+      user: Omit<typeof user, 'accessTokenId'>;
+    }> = {
+      success: true,
+      statusCode: 200,
+      message: 'User fetched successfully',
+      data: { user: { ...user, accessTokenId: undefined } },
+    };
+    return res.status(200).json(resultant);
+  } catch (error) {
+    logContext.function = 'getMe';
+    logger.error(logContext, 'Error in getMe controller', { error });
     throw error;
   }
 };
