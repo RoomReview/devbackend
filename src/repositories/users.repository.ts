@@ -7,8 +7,14 @@ const logContext: LogContext = {
   function: '',
 };
 
-export const createUser = async (user: UserCreateInput) => {
-  return await prisma.user.create({ data: user }).catch(err => {
+export const createUser = async (
+  user: UserCreateInput,
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.user.create({ data: user }).catch(err => {
     logContext.function = 'createUser';
     logger.error(logContext, 'Error in createUser repository', { error: err });
     throw new Error('DB: user create operation failed');

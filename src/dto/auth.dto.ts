@@ -14,8 +14,30 @@ export const RegisterUserDto = object({
   password: string().min(6),
   firstName: string().min(1),
   lastName: string().min(1),
-  role: enum_([UserRole['LANDLORD'], UserRole['TENANT']]),
+  role: enum_([
+    UserRole['LANDLORD'],
+    UserRole['TENANT'],
+    UserRole['AGENCY'],
+    UserRole['AGENT'],
+  ]),
+  agencyName: string().optional(),
+  agencyDescription: string().optional(),
+  agencyEmail: string().optional(),
+  agencyPhone: string().optional(),
+  agencyWebsite: string().optional(),
+}).superRefine((data, ctx) => {
+  if (
+    (data.role === UserRole['AGENCY'] || data.role === UserRole['AGENT']) &&
+    (!data.agencyName || data.agencyName.trim().length === 0)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Agency name is required for agency or agent role',
+      path: ['agencyName'],
+    });
+  }
 });
+
 
 export type RegisterUserDto = _infer<typeof RegisterUserDto>;
 
