@@ -22,17 +22,40 @@ import * as ssoController from '../controllers/sso.controller';
 import * as authController from '../controllers/auth.controller';
 import { authenticate } from '@middleware/auth.middleware';
 
+/**
+ * @swagger
+ * tags:
+ *   name: SSO
+ *   description: Single Sign-On operations (Google/Facebook OAuth)
+ */
+
 const router = Router();
 
-// ─── Google ────────────────────────────────────────────────────────────────
-
-/** Initiates Google OAuth — redirects to Google consent screen */
+/**
+ * @swagger
+ * /sso/google:
+ *   get:
+ *     summary: Initiate Google OAuth login
+ *     tags: [SSO]
+ *     responses:
+ *       302:
+ *         description: Redirects to Google login screen
+ */
 router.get(
   '/google',
   passport.authenticate('google', { session: false, scope: ['profile', 'email'] }),
 );
 
-/** Google OAuth callback — on success redirect to frontend, on failure redirect to error page */
+/**
+ * @swagger
+ * /sso/google/callback:
+ *   get:
+ *     summary: Google OAuth callback
+ *     tags: [SSO]
+ *     responses:
+ *       302:
+ *         description: Redirects to frontend with tokens on success
+ */
 router.get(
   '/google/callback',
   passport.authenticate('google', {
@@ -42,15 +65,31 @@ router.get(
   ssoController.ssoCallback,
 );
 
-// ─── Facebook ──────────────────────────────────────────────────────────────
-
-/** Initiates Facebook OAuth — redirects to Facebook login */
+/**
+ * @swagger
+ * /sso/facebook:
+ *   get:
+ *     summary: Initiate Facebook OAuth login
+ *     tags: [SSO]
+ *     responses:
+ *       302:
+ *         description: Redirects to Facebook login screen
+ */
 router.get(
   '/facebook',
   passport.authenticate('facebook', { session: false, scope: ['email'] }),
 );
 
-/** Facebook OAuth callback */
+/**
+ * @swagger
+ * /sso/facebook/callback:
+ *   get:
+ *     summary: Facebook OAuth callback
+ *     tags: [SSO]
+ *     responses:
+ *       302:
+ *         description: Redirects to frontend with tokens on success
+ */
 router.get(
   '/facebook/callback',
   passport.authenticate('facebook', {
@@ -60,17 +99,43 @@ router.get(
   ssoController.ssoCallback,
 );
 
-// ─── Shared ────────────────────────────────────────────────────────────────
-
-/** OAuth failure landing — triggered by Passport failureRedirect */
+/**
+ * @swagger
+ * /sso/failure:
+ *   get:
+ *     summary: SSO failure landing page
+ *     tags: [SSO]
+ *     responses:
+ *       200:
+ *         description: Renders failure message or redirects
+ */
 router.get('/failure', ssoController.ssoFailure);
 
-/** Invalidate current SSO session */
+/**
+ * @swagger
+ * /sso/logout:
+ *   get:
+ *     summary: SSO logout
+ *     tags: [SSO]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User logged out successfully
+ */
 router.get('/logout', authenticate, ssoController.ssoLogout);
 
 /**
- * Get authenticated SSO user profile (reuses the existing getMe handler).
- * Requires: Authorization: Bearer <accessToken>
+ * @swagger
+ * /sso/me:
+ *   get:
+ *     summary: Get authenticated SSO user profile
+ *     tags: [SSO]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile fetched successfully
  */
 router.get('/me', authenticate, authController.getMe);
 
