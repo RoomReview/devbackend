@@ -30,6 +30,8 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
+  agencies UserAgency[]
+
   @@map("users")
 }
 
@@ -37,6 +39,8 @@ enum UserRole {
   TENANT
   LANDLORD
   ADMIN
+  AGENCY
+  AGENT
 }
 
 model Session {
@@ -50,4 +54,35 @@ model Session {
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   @@map("sessions")
+}
+
+model Agency {
+  agencyId    String   @id @default(uuid(7)) @map("agency_id") @db.Uuid
+  name        String
+  description String?
+  email       String?  @unique
+  phone       String?
+  website     String?
+  isVerified  Boolean  @default(false) @map("is_verified")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users UserAgency[]
+
+  @@map("agencies")
+}
+
+model UserAgency {
+  userAgencyId String   @id @default(uuid(7)) @map("user_agency_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  agencyId     String   @map("agency_id") @db.Uuid
+  isVerified   Boolean  @default(false) @map("is_verified")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  agency Agency @relation(fields: [agencyId], references: [agencyId], onDelete: Cascade)
+
+  @@unique([userId, agencyId])
+  @@map("user_agency")
 }
