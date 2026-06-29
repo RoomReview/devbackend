@@ -47,6 +47,6 @@
     "diagnostics": true
 
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.*"]
+  "include": ["src/**/*", "scripts/**/*", "eslint.config.ts", "tsdown.config.ts"],
+  "exclude": ["node_modules", "dist", "test"]
 }

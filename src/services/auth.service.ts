@@ -4,10 +4,10 @@ import {
   ResetPasswordDto,
 } from '@/dto/auth.dto';
 import {
-  createUser,
   findUserByEmail,
   getUserSensitiveByEmail,
   updateUserPasswordAndClearCode,
+  registerUser as createUserAccount,
 } from './user.service';
 import { comparePassword, hashPassword } from '../utils/password';
 import {
@@ -67,25 +67,24 @@ export const registerUser = async (data: RegisterUserDto) => {
 
   logger.info(logContext, 'Verification token generated', { token });
 
-  // TODO: send the verification email with code
-  await sendVerificationEmail(data.email, token.code, `${data.firstName} ${data.lastName}`);
+  // send the verification email with code
+  await sendVerificationEmail(
+    data.email,
+    token.code,
+    `${data.firstName} ${data.lastName}`,
+  );
 
-  // create user
-  const user = await createUser({
-    email: data.email,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    verifyCodeExpiry: token.expiresAt,
-    verifyCodeHash: token.hashedCode,
-    passwordHash: hashedPassword,
-    isEmailVerified: false,
-    isActive: true,
+  // create user and agency/link if needed via user service
+  const user = await createUserAccount(data, hashedPassword, {
+    expiresAt: token.expiresAt,
+    hashedCode: token.hashedCode,
   });
 
+  const { passwordHash, verifyCodeHash, ...userWithoutSensitive } = user;
 
   // TBD: create session (Why register api return session(access&refresh tokens) without email verified)
 
-  return { user, session: {}, isExistingUser: false };
+  return { user: userWithoutSensitive, session: {}, isExistingUser: false };
 };
 
 export const loginUser = async (email: string, password: string) => {

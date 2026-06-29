@@ -3,10 +3,12 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+const nodeEnv = process.env.NODE_ENV || "local";
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
-    path: "prisma/migrations",
+    path: `prisma/${nodeEnv}/migrations`,
     seed: "tsx prisma/seeds/index.ts"
   },
   datasource: {

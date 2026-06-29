@@ -5,6 +5,13 @@ import { ChangePasswordDto } from '@/dto/user.dto';
 import { EntityNotFoundError, UnauthorizedError } from '@/utils/custom-error';
 import { comparePassword, hashPassword } from '@/utils/password';
 import { paginate } from '@/utils/helpers';
+import prisma from '@config/database';
+import { UserRole } from '@/generated/prisma/enums';
+import {
+  createAgency,
+  createUserAgency,
+} from '@/repositories/agencies.repository';
+import { RegisterUserDto } from '@/dto/auth.dto';
 
 export interface User {
   id: string;
@@ -26,7 +33,7 @@ const defaultSelectFields: UserSelect = {
 
 export const findAllUsers = async (data: PaginateArgs) => {
   const { page, limit } = data;
-  const { offset } = await paginate(page, limit);
+  const { offset } = paginate(page, limit);
   const users = await userDal.findAllUsers(limit, offset);
   return { users };
 };
@@ -66,7 +73,7 @@ export const changePassword = async (id: string, data: ChangePasswordDto) => {
     });
   }
 
-  if (!(await comparePassword(data.oldPassword, user.passwordHash))) {
+  if (!(await comparePassword(data.oldPassword, user.passwordHash ?? ''))) {
     throw new UnauthorizedError({
       message: 'Invalid old password',
       code: 'VALIDATION_ERROR',
@@ -107,6 +114,55 @@ export const createUser = async (
   }
   const { passwordHash, verifyCodeHash, ...userWithoutPassword } = user;
   return userWithoutPassword;
+};
+
+export const registerUser = async (
+  data: RegisterUserDto,
+  hashedPassword: string,
+  token: { expiresAt: Date; hashedCode: string },
+) => {
+  return await prisma.$transaction(async (tx) => {
+    // create user
+    const newUser = await userDal.createUser(
+      {
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        verifyCodeExpiry: token.expiresAt,
+        verifyCodeHash: token.hashedCode,
+        passwordHash: hashedPassword,
+        isEmailVerified: false,
+        isActive: true,
+        role: data.role as any,
+      },
+      tx,
+    );
+
+    // create agency and link if role is AGENCY or AGENT
+    if (data.role === UserRole.AGENCY || data.role === UserRole.AGENT) {
+      const agency = await createAgency(
+        {
+          name: data.agencyName!,
+          description: data.agencyDescription,
+          email: data.agencyEmail,
+          phone: data.agencyPhone,
+          website: data.agencyWebsite,
+        },
+        tx,
+      );
+
+      await createUserAgency(
+        {
+          userId: newUser.userId,
+          agencyId: agency.agencyId,
+          isVerified: false,
+        },
+        tx,
+      );
+    }
+
+    return newUser;
+  });
 };
 
 export const updateUser = async (
