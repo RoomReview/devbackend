@@ -31,6 +31,7 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   agencies UserAgency[]
+  session  Session?
 
   @@map("users")
 }
@@ -52,6 +53,8 @@ model Session {
   refreshTokenExpiry DateTime? @map("refresh_token_expiry")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("sessions")
 }
@@ -85,4 +88,27 @@ model UserAgency {
 
   @@unique([userId, agencyId])
   @@map("user_agency")
+}
+
+model Area {
+  areaId       String   @id @default(uuid(7)) @map("area_id") @db.Uuid
+  parentAreaId String?  @map("parent_area_id") @db.Uuid
+  areaType     AreaType @map("area_type")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  parentArea Area?  @relation("AreaHierarchy", fields: [parentAreaId], references: [areaId])
+  childAreas Area[] @relation("AreaHierarchy")
+
+  @@index([parentAreaId])
+  @@index([areaType, name])
+  @@map("areas")
+}
+
+enum AreaType {
+  BOROUGH
+  POSTCODE
+  CITY
+  NEIGHBOURHOOD
 }
