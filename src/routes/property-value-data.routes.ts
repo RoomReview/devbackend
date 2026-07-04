@@ -9,13 +9,19 @@ const router = Router();
 router.get('/', valController.getAllPropertyValueData);
 router.get('/:id', valController.getPropertyValueDataById);
 
-// Admin-only updates
 router.post(
   '/',
   authenticate,
   authorize('manage:locations'),
   validateRequest({ body: CreatePropertyValueDataDto }),
   valController.createPropertyValueData,
+);
+
+router.post(
+  '/bulk',
+  authenticate,
+  authorize('manage:locations'),
+  valController.bulkCreatePropertyValueData,
 );
 
 router.put(

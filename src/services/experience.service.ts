@@ -7,7 +7,8 @@ import {
   deleteExperience,
   FindExperiencesFilter,
 } from '@/repositories/experience.repository';
-import { EntityNotFoundError, ForbiddenError } from '@/utils/custom-error';
+import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/custom-error';
+import { findPostcodeById } from '@/repositories/postcode.repository';
 import type { CreateExperienceDto, UpdateExperienceDto, UpdateExperienceStatusDto } from '@/dto/experience.dto';
 import { paginate } from '@/utils/helpers';
 import { ExperienceStatus, UserRole } from '@/generated/prisma/enums';
@@ -41,6 +42,16 @@ export const getExperienceById = async (id: string) => {
 };
 
 export const createNewExperience = async (data: CreateExperienceDto, authorId: string | null) => {
+  if (data.postcodeId) {
+    const postcode = await findPostcodeById(data.postcodeId);
+    if (!postcode) {
+      throw new ValidationError({
+        message: `Postcode with ID ${data.postcodeId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+  }
+
   return await createExperience({
     type: data.type,
     title: data.title,
@@ -70,6 +81,16 @@ export const updateExperienceById = async (
       message: 'You are not authorized to update this experience',
       code: 'VALIDATION_ERROR',
     });
+  }
+
+  if (data.postcodeId) {
+    const postcode = await findPostcodeById(data.postcodeId);
+    if (!postcode) {
+      throw new ValidationError({
+        message: `Postcode with ID ${data.postcodeId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
   }
 
   return await updateExperience(id, {

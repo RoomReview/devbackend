@@ -8,10 +8,11 @@ import {
   incrementPropertyViewCount,
   FindPropertiesFilter,
 } from '@/repositories/property.repository';
-import { EntityNotFoundError, ForbiddenError } from '@/utils/custom-error';
+import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/custom-error';
 import type { CreatePropertyDto, UpdatePropertyDto } from '@/dto/property.dto';
 import { paginate } from '@/utils/helpers';
 import { PropertyStatus, UserRole } from '@/generated/prisma/enums';
+import { findPostcodeById } from '@/repositories/postcode.repository';
 
 export const getAllProperties = async (page: number, limit: number, filter?: FindPropertiesFilter) => {
   const { offset } = paginate(page, limit);
@@ -46,6 +47,14 @@ export const getPropertyById = async (id: string) => {
 };
 
 export const createNewProperty = async (data: CreatePropertyDto, landlordId: string) => {
+  const postcode = await findPostcodeById(data.postcodeId);
+  if (!postcode) {
+    throw new ValidationError({
+      message: `Postcode with ID ${data.postcodeId} does not exist`,
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
   return await createProperty({
     title: data.title,
     description: data.description,
@@ -95,6 +104,16 @@ export const updatePropertyById = async (
       message: 'You are not authorized to update this property',
       code: 'VALIDATION_ERROR',
     });
+  }
+
+  if (data.postcodeId) {
+    const postcode = await findPostcodeById(data.postcodeId);
+    if (!postcode) {
+      throw new ValidationError({
+        message: `Postcode with ID ${data.postcodeId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
   }
 
   return await updateProperty(id, {

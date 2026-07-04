@@ -1,5 +1,6 @@
 import {
   createVotingData,
+  createManyVotingData,
   findVotingDataById,
   findAllVotingData,
   countVotingData,
@@ -48,6 +49,19 @@ export const createNewVotingData = async (data: CreateVotingDataDto) => {
     votes: data.votes,
     percentage: data.percentage,
   });
+};
+
+export const bulkCreateVotingData = async (data: CreateVotingDataDto[]) => {
+  return await createManyVotingData(
+    data.map(item => ({
+      borough: item.borough,
+      wardName: item.wardName,
+      year: item.year,
+      party: item.party,
+      votes: item.votes,
+      percentage: item.percentage,
+    }))
+  );
 };
 
 export const updateVotingDataById = async (id: string, data: UpdateVotingDataDto) => {

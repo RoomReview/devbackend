@@ -7,7 +7,9 @@ import {
   deleteReview,
   FindReviewsFilter,
 } from '@/repositories/review.repository';
-import { EntityNotFoundError, ForbiddenError } from '@/utils/custom-error';
+import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/custom-error';
+import { findPostcodeById } from '@/repositories/postcode.repository';
+import { findBoroughById } from '@/repositories/borough.repository';
 import type { CreateReviewDto, UpdateReviewDto, UpdateReviewStatusDto } from '@/dto/review.dto';
 import { paginate } from '@/utils/helpers';
 import { ReviewStatus, UserRole } from '@/generated/prisma/enums';
@@ -41,6 +43,26 @@ export const getReviewById = async (id: string) => {
 };
 
 export const createNewReview = async (data: CreateReviewDto, authorId: string) => {
+  if (data.postcodeId) {
+    const postcode = await findPostcodeById(data.postcodeId);
+    if (!postcode) {
+      throw new ValidationError({
+        message: `Postcode with ID ${data.postcodeId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+  }
+
+  if (data.boroughId) {
+    const borough = await findBoroughById(data.boroughId);
+    if (!borough) {
+      throw new ValidationError({
+        message: `Borough with ID ${data.boroughId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+  }
+
   const overallRating =
     (data.safetyRating +
       data.transportRating +
@@ -82,6 +104,26 @@ export const updateReviewById = async (
       message: 'You are not authorized to update this review',
       code: 'VALIDATION_ERROR',
     });
+  }
+
+  if (data.postcodeId) {
+    const postcode = await findPostcodeById(data.postcodeId);
+    if (!postcode) {
+      throw new ValidationError({
+        message: `Postcode with ID ${data.postcodeId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+  }
+
+  if (data.boroughId) {
+    const borough = await findBoroughById(data.boroughId);
+    if (!borough) {
+      throw new ValidationError({
+        message: `Borough with ID ${data.boroughId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
   }
 
   // Calculate new overall rating if any individual rating changes

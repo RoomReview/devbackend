@@ -21,6 +21,20 @@ export const createCrimeData = async (
   });
 };
 
+export const createManyCrimeData = async (
+  data: CrimeDataCreateInput[],
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.crimeData.createMany({ data }).catch(err => {
+    logContext.function = 'createManyCrimeData';
+    logger.error(logContext, 'Error in createManyCrimeData repository', { error: err });
+    throw new Error('DB: crime data bulk create operation failed');
+  });
+};
+
 export const findCrimeDataById = async (crimeDataId: string, select?: CrimeDataSelect) => {
   return await prisma.crimeData.findUnique({
     where: { crimeDataId },

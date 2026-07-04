@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as creditsController from '@controllers/user-credits.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
-import { UpdateUserCreditsDto } from '@/dto/user-credits.dto';
+import { UpdateUserCreditsDto, AdjustUserCreditsDto } from '@/dto/user-credits.dto';
 
 const router = Router();
 
@@ -15,6 +15,13 @@ router.put(
   authorize('manage:credits'),
   validateRequest({ body: UpdateUserCreditsDto }),
   creditsController.updateUserCredits,
+);
+
+router.post(
+  '/user/:userId/adjust',
+  authorize('manage:credits'),
+  validateRequest({ body: AdjustUserCreditsDto }),
+  creditsController.adjustUserCredits,
 );
 
 export default router;

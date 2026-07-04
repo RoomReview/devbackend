@@ -1,5 +1,6 @@
 import {
   createPropertyValueData,
+  createManyPropertyValueData,
   findPropertyValueDataById,
   findAllPropertyValueData,
   countPropertyValueData,
@@ -47,6 +48,18 @@ export const createNewPropertyValueData = async (data: CreatePropertyValueDataDt
     salesVolume: data.salesVolume,
     recordedDate: new Date(data.recordedDate),
   });
+};
+
+export const bulkCreatePropertyValueData = async (data: CreatePropertyValueDataDto[]) => {
+  return await createManyPropertyValueData(
+    data.map(item => ({
+      postcode: item.postcode,
+      averageValue: item.averageValue,
+      growthRate: item.growthRate,
+      salesVolume: item.salesVolume,
+      recordedDate: new Date(item.recordedDate),
+    }))
+  );
 };
 
 export const updatePropertyValueDataById = async (id: string, data: UpdatePropertyValueDataDto) => {

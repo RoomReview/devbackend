@@ -21,6 +21,20 @@ export const createVotingData = async (
   });
 };
 
+export const createManyVotingData = async (
+  data: VotingDataCreateInput[],
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.votingData.createMany({ data }).catch(err => {
+    logContext.function = 'createManyVotingData';
+    logger.error(logContext, 'Error in createManyVotingData repository', { error: err });
+    throw new Error('DB: voting data bulk create operation failed');
+  });
+};
+
 export const findVotingDataById = async (votingDataId: string, select?: VotingDataSelect) => {
   return await prisma.votingData.findUnique({
     where: { votingDataId },

@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest, ApiResponse } from '@/types';
 import * as creditsService from '@/services/user-credits.service';
-import type { UpdateUserCreditsDto } from '@/dto/user-credits.dto';
+import type { UpdateUserCreditsDto, AdjustUserCreditsDto } from '@/dto/user-credits.dto';
 import { UserRole } from '@/generated/prisma/enums';
 import { ForbiddenError } from '@/utils/custom-error';
 
@@ -44,6 +44,23 @@ export const updateUserCredits = async (
     statusCode: 200,
     data,
     message: 'User credits updated successfully',
+  };
+  res.status(200).json(response);
+};
+
+export const adjustUserCredits = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  const { userId } = req.params;
+  const body = req.body as AdjustUserCreditsDto;
+  const data = await creditsService.adjustUserCredits(userId, body.amount, body.type, body.description);
+
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 200,
+    data,
+    message: 'User credits balance adjusted successfully',
   };
   res.status(200).json(response);
 };

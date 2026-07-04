@@ -21,6 +21,20 @@ export const createPropertyValueData = async (
   });
 };
 
+export const createManyPropertyValueData = async (
+  data: PropertyValueDataCreateInput[],
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.propertyValueData.createMany({ data }).catch(err => {
+    logContext.function = 'createManyPropertyValueData';
+    logger.error(logContext, 'Error in createManyPropertyValueData repository', { error: err });
+    throw new Error('DB: property value data bulk create operation failed');
+  });
+};
+
 export const findPropertyValueDataById = async (propertyValueDataId: string, select?: PropertyValueDataSelect) => {
   return await prisma.propertyValueData.findUnique({
     where: { propertyValueDataId },

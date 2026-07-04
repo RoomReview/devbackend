@@ -9,13 +9,19 @@ const router = Router();
 router.get('/', crimeController.getAllCrimeData);
 router.get('/:id', crimeController.getCrimeDataById);
 
-// Admin-only updates
 router.post(
   '/',
   authenticate,
   authorize('manage:locations'),
   validateRequest({ body: CreateCrimeDataDto }),
   crimeController.createCrimeData,
+);
+
+router.post(
+  '/bulk',
+  authenticate,
+  authorize('manage:locations'),
+  crimeController.bulkCreateCrimeData,
 );
 
 router.put(

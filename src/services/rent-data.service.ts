@@ -1,5 +1,6 @@
 import {
   createRentData,
+  createManyRentData,
   findRentDataById,
   findAllRentData,
   countRentData,
@@ -50,6 +51,21 @@ export const createNewRentData = async (data: CreateRentDataDto) => {
     sampleSize: data.sampleSize,
     recordedDate: new Date(data.recordedDate),
   });
+};
+
+export const bulkCreateRentData = async (data: CreateRentDataDto[]) => {
+  return await createManyRentData(
+    data.map(item => ({
+      postcode: item.postcode,
+      propertyType: item.propertyType,
+      bedrooms: item.bedrooms,
+      averageRent: item.averageRent,
+      minRent: item.minRent,
+      maxRent: item.maxRent,
+      sampleSize: item.sampleSize,
+      recordedDate: new Date(item.recordedDate),
+    }))
+  );
 };
 
 export const updateRentDataById = async (id: string, data: UpdateRentDataDto) => {

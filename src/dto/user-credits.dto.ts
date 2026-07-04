@@ -1,4 +1,4 @@
-import { SubscriptionPlan } from '@/generated/prisma/enums';
+import { SubscriptionPlan, TransactionType } from '@/generated/prisma/enums';
 import {
   object,
   number,
@@ -22,3 +22,20 @@ export const UpdateUserCreditsDto = object({
 });
 
 export type UpdateUserCreditsDto = _infer<typeof UpdateUserCreditsDto>;
+
+export const AdjustUserCreditsDto = object({
+  amount: number().int(),
+  type: enum_([
+    TransactionType.BONUS,
+    TransactionType.REFUND,
+    TransactionType.PURCHASE,
+    TransactionType.SUBSCRIPTION,
+    TransactionType.DOWNLOAD,
+    TransactionType.AI_SUMMARY,
+    TransactionType.VALUATION,
+  ]),
+  description: string().min(1),
+});
+
+export type AdjustUserCreditsDto = _infer<typeof AdjustUserCreditsDto>;
+

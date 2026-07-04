@@ -56,6 +56,21 @@ export const createCrimeData = async (
   res.status(201).json(response);
 };
 
+export const bulkCreateCrimeData = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const data = await crimeService.bulkCreateCrimeData(req.body as CreateCrimeDataDto[]);
+
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 201,
+    data,
+    message: 'Crime data records imported successfully',
+  };
+  res.status(201).json(response);
+};
+
 export const updateCrimeData = async (
   req: Request,
   res: Response,

@@ -57,6 +57,21 @@ export const createVotingData = async (
   res.status(201).json(response);
 };
 
+export const bulkCreateVotingData = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const data = await votingService.bulkCreateVotingData(req.body as CreateVotingDataDto[]);
+
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 201,
+    data,
+    message: 'Voting data records imported successfully',
+  };
+  res.status(201).json(response);
+};
+
 export const updateVotingData = async (
   req: Request,
   res: Response,

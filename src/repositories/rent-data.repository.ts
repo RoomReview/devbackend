@@ -21,6 +21,20 @@ export const createRentData = async (
   });
 };
 
+export const createManyRentData = async (
+  data: RentDataCreateInput[],
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.rentData.createMany({ data }).catch(err => {
+    logContext.function = 'createManyRentData';
+    logger.error(logContext, 'Error in createManyRentData repository', { error: err });
+    throw new Error('DB: rent data bulk create operation failed');
+  });
+};
+
 export const findRentDataById = async (rentDataId: string, select?: RentDataSelect) => {
   return await prisma.rentData.findUnique({
     where: { rentDataId },

@@ -9,13 +9,19 @@ const router = Router();
 router.get('/', votingController.getAllVotingData);
 router.get('/:id', votingController.getVotingDataById);
 
-// Admin-only updates
 router.post(
   '/',
   authenticate,
   authorize('manage:locations'),
   validateRequest({ body: CreateVotingDataDto }),
   votingController.createVotingData,
+);
+
+router.post(
+  '/bulk',
+  authenticate,
+  authorize('manage:locations'),
+  votingController.bulkCreateVotingData,
 );
 
 router.put(

@@ -55,6 +55,21 @@ export const createPropertyValueData = async (
   res.status(201).json(response);
 };
 
+export const bulkCreatePropertyValueData = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const data = await valService.bulkCreatePropertyValueData(req.body as CreatePropertyValueDataDto[]);
+
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 201,
+    data,
+    message: 'Property value data records imported successfully',
+  };
+  res.status(201).json(response);
+};
+
 export const updatePropertyValueData = async (
   req: Request,
   res: Response,

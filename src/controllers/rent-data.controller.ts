@@ -57,6 +57,21 @@ export const createRentData = async (
   res.status(201).json(response);
 };
 
+export const bulkCreateRentData = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const data = await rentService.bulkCreateRentData(req.body as CreateRentDataDto[]);
+
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 201,
+    data,
+    message: 'Rent data records imported successfully',
+  };
+  res.status(201).json(response);
+};
+
 export const updateRentData = async (
   req: Request,
   res: Response,

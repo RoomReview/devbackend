@@ -9,13 +9,19 @@ const router = Router();
 router.get('/', demoController.getAllDemography);
 router.get('/:id', demoController.getDemographyById);
 
-// Admin-only updates
 router.post(
   '/',
   authenticate,
   authorize('manage:locations'),
   validateRequest({ body: CreateDemographyDto }),
   demoController.createDemography,
+);
+
+router.post(
+  '/bulk',
+  authenticate,
+  authorize('manage:locations'),
+  demoController.bulkCreateDemography,
 );
 
 router.put(

@@ -1,5 +1,6 @@
 import {
   createDemography,
+  createManyDemography,
   findDemographyById,
   findAllDemography,
   countDemography,
@@ -47,6 +48,18 @@ export const createNewDemography = async (data: CreateDemographyDto) => {
     socialGrade: data.socialGrade,
     recordedDate: new Date(data.recordedDate),
   });
+};
+
+export const bulkCreateDemography = async (data: CreateDemographyDto[]) => {
+  return await createManyDemography(
+    data.map(item => ({
+      postcode: item.postcode,
+      population: item.population,
+      medianAge: item.medianAge,
+      socialGrade: item.socialGrade,
+      recordedDate: new Date(item.recordedDate),
+    }))
+  );
 };
 
 export const updateDemographyById = async (id: string, data: UpdateDemographyDto) => {

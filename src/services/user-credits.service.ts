@@ -22,6 +22,40 @@ export const getUserCreditsByUserId = async (userId: string) => {
       aiSummaryLimit: 5,
     });
   }
+  return await checkAndResetExpiredSubscription(credits);
+};
+
+export const checkAndResetExpiredSubscription = async (credits: any) => {
+  if (
+    credits.subscriptionPlan !== SubscriptionPlan.FREE &&
+    credits.planExpiresAt &&
+    new Date(credits.planExpiresAt) < new Date()
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Reset user credits
+      const updatedCredits = await tx.userCredits.update({
+        where: { userCreditsId: credits.userCreditsId },
+        data: {
+          subscriptionPlan: SubscriptionPlan.FREE,
+          aiSummaryLimit: 5,
+          planExpiresAt: null,
+        },
+      });
+
+      // 2. Log credit transaction
+      await tx.creditTransaction.create({
+        data: {
+          userCredits: { connect: { userCreditsId: credits.userCreditsId } },
+          amount: 0,
+          type: TransactionType.SUBSCRIPTION,
+          description: `Subscription tier ${credits.subscriptionPlan} expired. Reverted to Free plan.`,
+          balanceAfter: updatedCredits.creditsBalance,
+        },
+      });
+
+      return updatedCredits;
+    });
+  }
   return credits;
 };
 
@@ -33,7 +67,7 @@ export const getUserCreditsById = async (id: string) => {
       code: 'ENTITY_NOT_FOUND',
     });
   }
-  return credits;
+  return await checkAndResetExpiredSubscription(credits);
 };
 
 
@@ -127,3 +161,17 @@ export const addCredits = async (
     return updatedCredits;
   });
 };
+
+export const adjustUserCredits = async (
+  userId: string,
+  amount: number,
+  type: TransactionType,
+  description: string,
+) => {
+  if (amount < 0) {
+    return await deductCredits(userId, amount, type, description);
+  } else {
+    return await addCredits(userId, amount, type, description);
+  }
+};
+

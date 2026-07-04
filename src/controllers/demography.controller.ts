@@ -55,6 +55,21 @@ export const createDemography = async (
   res.status(201).json(response);
 };
 
+export const bulkCreateDemography = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const data = await demoService.bulkCreateDemography(req.body as CreateDemographyDto[]);
+
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 201,
+    data,
+    message: 'Demography records imported successfully',
+  };
+  res.status(201).json(response);
+};
+
 export const updateDemography = async (
   req: Request,
   res: Response,

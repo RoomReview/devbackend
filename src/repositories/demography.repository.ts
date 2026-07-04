@@ -21,6 +21,20 @@ export const createDemography = async (
   });
 };
 
+export const createManyDemography = async (
+  data: DemographyCreateInput[],
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.demography.createMany({ data }).catch(err => {
+    logContext.function = 'createManyDemography';
+    logger.error(logContext, 'Error in createManyDemography repository', { error: err });
+    throw new Error('DB: demography bulk create operation failed');
+  });
+};
+
 export const findDemographyById = async (demographyId: string, select?: DemographySelect) => {
   return await prisma.demography.findUnique({
     where: { demographyId },

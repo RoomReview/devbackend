@@ -1,5 +1,6 @@
 import {
   createCrimeData,
+  createManyCrimeData,
   findCrimeDataById,
   findAllCrimeData,
   countCrimeData,
@@ -46,6 +47,17 @@ export const createNewCrimeData = async (data: CreateCrimeDataDto) => {
     crimeCount: data.crimeCount,
     recordedDate: new Date(data.recordedDate),
   });
+};
+
+export const bulkCreateCrimeData = async (data: CreateCrimeDataDto[]) => {
+  return await createManyCrimeData(
+    data.map(item => ({
+      borough: item.borough,
+      crimeType: item.crimeType,
+      crimeCount: item.crimeCount,
+      recordedDate: new Date(item.recordedDate),
+    }))
+  );
 };
 
 export const updateCrimeDataById = async (id: string, data: UpdateCrimeDataDto) => {

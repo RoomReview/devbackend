@@ -9,13 +9,19 @@ const router = Router();
 router.get('/', rentController.getAllRentData);
 router.get('/:id', rentController.getRentDataById);
 
-// Admin-only updates
 router.post(
   '/',
   authenticate,
   authorize('manage:locations'),
   validateRequest({ body: CreateRentDataDto }),
   rentController.createRentData,
+);
+
+router.post(
+  '/bulk',
+  authenticate,
+  authorize('manage:locations'),
+  rentController.bulkCreateRentData,
 );
 
 router.put(
