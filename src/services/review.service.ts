@@ -1,52 +1,146 @@
-// Review service - Business logic for reviews
+import {
+  createReview,
+  findReviewById,
+  findAllReviews,
+  countReviews,
+  updateReview,
+  deleteReview,
+  FindReviewsFilter,
+} from '@/repositories/review.repository';
+import { EntityNotFoundError, ForbiddenError } from '@/utils/custom-error';
+import type { CreateReviewDto, UpdateReviewDto, UpdateReviewStatusDto } from '@/dto/review.dto';
+import { paginate } from '@/utils/helpers';
+import { ReviewStatus, UserRole } from '@/generated/prisma/enums';
 
-export interface Review {
-  id: string;
-  propertyId: string;
-  userId: string;
-  rating: number;
-  title: string;
-  content: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export const getAllReviews = async (page: number, limit: number, filter?: FindReviewsFilter) => {
+  const { offset } = paginate(page, limit);
+  const reviews = await findAllReviews(limit, offset, filter);
+  const total = await countReviews(filter);
+  const totalPages = Math.ceil(total / limit);
 
-export const findAllReviews = async (): Promise<Review[]> => {
-  // TODO: Implement with Prisma
-  return [];
-};
-
-export const findReviewById = async (id: string): Promise<Review | null> => {
-  // TODO: Implement with Prisma
-  console.log(`Finding review: ${id}`);
-  return null;
-};
-
-export const createReview = async (data: Partial<Review>): Promise<Review> => {
-  // TODO: Implement with Prisma
   return {
-    id: 'temp-id',
-    propertyId: data.propertyId ?? '',
-    userId: data.userId ?? '',
-    rating: data.rating ?? 0,
-    title: data.title ?? '',
-    content: data.content ?? '',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    data: reviews,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
   };
 };
 
-export const updateReview = async (
-  id: string,
-  data: Partial<Review>,
-): Promise<Review | null> => {
-  // TODO: Implement with Prisma
-  console.log(`Updating review: ${id}`, data);
-  return null;
+export const getReviewById = async (id: string) => {
+  const review = await findReviewById(id);
+  if (!review) {
+    throw new EntityNotFoundError({
+      message: `Review with ID ${id} not found`,
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+  return review;
 };
 
-export const deleteReview = async (id: string): Promise<boolean> => {
-  // TODO: Implement with Prisma
-  console.log(`Deleting review: ${id}`);
-  return true;
+export const createNewReview = async (data: CreateReviewDto, authorId: string) => {
+  const overallRating =
+    (data.safetyRating +
+      data.transportRating +
+      data.amenitiesRating +
+      data.valueRating) /
+    4;
+
+  return await createReview({
+    title: data.title,
+    content: data.content,
+    safetyRating: data.safetyRating,
+    transportRating: data.transportRating,
+    amenitiesRating: data.amenitiesRating,
+    valueRating: data.valueRating,
+    overallRating,
+    pros: data.pros,
+    cons: data.cons,
+    yearsLived: data.yearsLived,
+    anonymous: data.anonymous ?? false,
+    verified: false,
+    status: ReviewStatus.PENDING,
+    author: { connect: { userId: authorId } },
+    ...(data.postcodeId ? { postcode: { connect: { postcodeId: data.postcodeId } } } : {}),
+    ...(data.boroughId ? { borough: { connect: { boroughId: data.boroughId } } } : {}),
+  });
+};
+
+export const updateReviewById = async (
+  id: string,
+  data: UpdateReviewDto,
+  userId: string,
+  userRole: string,
+) => {
+  const existing = await getReviewById(id);
+
+  // Authorization check: Only author or ADMIN can update
+  if (existing.authorId !== userId && userRole !== UserRole.ADMIN) {
+    throw new ForbiddenError({
+      message: 'You are not authorized to update this review',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  // Calculate new overall rating if any individual rating changes
+  let overallRating: number | undefined;
+  const safetyRating = data.safetyRating !== undefined ? data.safetyRating : existing.safetyRating;
+  const transportRating = data.transportRating !== undefined ? data.transportRating : existing.transportRating;
+  const amenitiesRating = data.amenitiesRating !== undefined ? data.amenitiesRating : existing.amenitiesRating;
+  const valueRating = data.valueRating !== undefined ? data.valueRating : existing.valueRating;
+
+  if (
+    data.safetyRating !== undefined ||
+    data.transportRating !== undefined ||
+    data.amenitiesRating !== undefined ||
+    data.valueRating !== undefined
+  ) {
+    overallRating = (safetyRating + transportRating + amenitiesRating + valueRating) / 4;
+  }
+
+  return await updateReview(id, {
+    title: data.title,
+    content: data.content,
+    safetyRating: data.safetyRating,
+    transportRating: data.transportRating,
+    amenitiesRating: data.amenitiesRating,
+    valueRating: data.valueRating,
+    overallRating,
+    pros: data.pros,
+    cons: data.cons,
+    yearsLived: data.yearsLived,
+    anonymous: data.anonymous,
+    ...(data.postcodeId ? { postcode: { connect: { postcodeId: data.postcodeId } } } : {}),
+    ...(data.boroughId ? { borough: { connect: { boroughId: data.boroughId } } } : {}),
+  });
+};
+
+export const updateReviewStatusById = async (id: string, data: UpdateReviewStatusDto) => {
+  const updateData: any = {
+    status: data.status,
+    rejectionReason: data.status === ReviewStatus.REJECTED ? data.rejectionReason : null,
+  };
+
+  if (data.status === ReviewStatus.APPROVED) {
+    updateData.publishedAt = new Date();
+    updateData.verified = true; // Auto-verified when approved by admin
+  }
+
+  return await updateReview(id, updateData);
+};
+
+export const deleteReviewById = async (id: string, userId: string, userRole: string) => {
+  const existing = await getReviewById(id);
+
+  // Authorization check: Only author or ADMIN can delete
+  if (existing.authorId !== userId && userRole !== UserRole.ADMIN) {
+    throw new ForbiddenError({
+      message: 'You are not authorized to delete this review',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  return await deleteReview(id);
 };

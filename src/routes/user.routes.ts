@@ -7,6 +7,7 @@ import {
 } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { ChangePasswordDto } from '@/dto/user.dto';
+import { UpdateUserProfileDto } from '@/dto/update-user.dto';
 
 /**
  * @swagger
@@ -117,7 +118,13 @@ router.post('/', userController.createUser);
  *       200:
  *         description: User updated successfully
  */
-router.put('/:id', userController.updateUser);
+router.put(
+  '/:id',
+  authenticate,
+  requireMatchingUser(['params.id']),
+  validateRequest({ body: UpdateUserProfileDto }),
+  userController.updateUser,
+);
 
 /**
  * @swagger
@@ -136,7 +143,12 @@ router.put('/:id', userController.updateUser);
  *       200:
  *         description: User deleted successfully
  */
-router.delete('/:id', userController.deleteUser);
+router.delete(
+  '/:id',
+  authenticate,
+  requireMatchingUser(['params.id']),
+  userController.deleteUser,
+);
 
 /**
  * @swagger

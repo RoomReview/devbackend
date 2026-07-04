@@ -1,4 +1,4 @@
-import { UserSelect, UserCreateInput } from '@/generated/prisma/models';
+import { UserSelect, UserCreateInput, UserUpdateInput } from '@/generated/prisma/models';
 import logger, { LogContext } from '@/utils/logger';
 import prisma from '@config/database';
 
@@ -237,6 +237,40 @@ export const upsertSsoUser = async (data: SsoUpsertInput) => {
     logContext.function = 'upsertSsoUser';
     logger.error(logContext, 'Error in upsertSsoUser repository', { error: err });
     throw new Error('DB: upsertSsoUser operation failed');
+  });
+};
+
+export const updateUser = async (
+  userId: string,
+  data: UserUpdateInput,
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.user.update({
+    where: { userId },
+    data,
+  }).catch(err => {
+    logContext.function = 'updateUser';
+    logger.error(logContext, 'Error in updateUser repository', { error: err });
+    throw new Error('DB: user update operation failed');
+  });
+};
+
+export const deleteUser = async (
+  userId: string,
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+  > = prisma,
+) => {
+  return await tx.user.delete({
+    where: { userId },
+  }).catch(err => {
+    logContext.function = 'deleteUser';
+    logger.error(logContext, 'Error in deleteUser repository', { error: err });
+    throw new Error('DB: user delete operation failed');
   });
 };
 
