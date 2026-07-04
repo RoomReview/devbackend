@@ -8,6 +8,9 @@ import boroughRoutes from './borough.routes';
 import postcodeRoutes from './postcode.routes';
 import savedPropertyRoutes from './saved-property.routes';
 import experienceRoutes from './experience.routes';
+import blogCategoryRoutes from './blog-category.routes';
+import blogTagRoutes from './blog-tag.routes';
+import blogPostRoutes from './blog-post.routes';
 import { errorHandler, notFoundHandler } from '@middleware/error.middleware';
 
 const router = Router();
@@ -21,6 +24,9 @@ router.use('/boroughs', boroughRoutes);
 router.use('/postcodes', postcodeRoutes);
 router.use('/saved-properties', savedPropertyRoutes);
 router.use('/experiences', experienceRoutes);
+router.use('/blog/categories', blogCategoryRoutes);
+router.use('/blog/tags', blogTagRoutes);
+router.use('/blog/posts', blogPostRoutes);
 router.use(notFoundHandler);
 router.use(errorHandler);
 
