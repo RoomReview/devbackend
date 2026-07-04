@@ -8,4 +8,5 @@ export const permissions = {
   'approve:reviews': [UserRole.ADMIN],
   'manage:properties': [UserRole.ADMIN],
   'manage:locations': [UserRole.ADMIN],
+  'approve:experiences': [UserRole.ADMIN],
 } as const;
