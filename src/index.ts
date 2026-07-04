@@ -11,6 +11,7 @@ import morgan from 'morgan';
 import { errorHandler, notFoundHandler } from '@middleware/error.middleware';
 import { assignRequestId } from '@middleware/request-id.middleware.js';
 import { getCustomMorganFormat } from '@middleware/request-logger.middleware';
+import { requestTimeout } from '@middleware/timeout.middleware';
 import routes from './routes';
 import { configurePassport } from '@utils/sso.login';
 
@@ -26,6 +27,7 @@ app.use(cors());
 app.use(morgan(getCustomMorganFormat));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(requestTimeout());
 
 // Passport SSO (session-less — must come after body parsers)
 configurePassport(app);

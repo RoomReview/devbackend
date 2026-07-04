@@ -1,6 +1,7 @@
 const ErrorCodes = {
   ENTITY_NOT_FOUND: 'ENTITY_NOT_FOUND',
   INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
+  REQUEST_TIMEOUT: 'REQUEST_TIMEOUT',
   ROUTE_NOT_FOUND: 'ROUTE_NOT_FOUND',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
 } as const;
@@ -49,10 +50,14 @@ class UnauthorizedError extends CustomError<ErrorCode> {
 class ForbiddenError extends CustomError<ErrorCode> {
   statusCode: number = 403;
 }
+class RequestTimeoutError extends CustomError<ErrorCode> {
+  statusCode: number = 408;
+}
 
 export {
   EntityNotFoundError,
   InternalServerError,
+  RequestTimeoutError,
   RouteNotFoundError,
   ValidationError,
   ErrorCodes,
