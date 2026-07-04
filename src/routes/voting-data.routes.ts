@@ -6,9 +6,75 @@ import { CreateVotingDataDto, UpdateVotingDataDto } from '@/dto/voting-data.dto'
 
 const router = Router();
 
+/**
+ * @swagger
+ * /data/voting:
+ *   get:
+ *     summary: GET Voting Data
+ *     tags: [Voting Data]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/', votingController.getAllVotingData);
+/**
+ * @swagger
+ * /data/voting/{id}:
+ *   get:
+ *     summary: GET Voting Data
+ *     tags: [Voting Data]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/:id', votingController.getVotingDataById);
 
+/**
+ * @swagger
+ * /data/voting:
+ *   post:
+ *     summary: POST Voting Data
+ *     tags: [Voting Data]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       201:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post(
   '/',
   authenticate,
@@ -17,6 +83,30 @@ router.post(
   votingController.createVotingData,
 );
 
+/**
+ * @swagger
+ * /data/voting/bulk:
+ *   post:
+ *     summary: POST Voting Data
+ *     tags: [Voting Data]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       201:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post(
   '/bulk',
   authenticate,
@@ -24,6 +114,36 @@ router.post(
   votingController.bulkCreateVotingData,
 );
 
+/**
+ * @swagger
+ * /data/voting/{id}:
+ *   put:
+ *     summary: PUT Voting Data
+ *     tags: [Voting Data]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.put(
   '/:id',
   authenticate,
@@ -32,6 +152,30 @@ router.put(
   votingController.updateVotingData,
 );
 
+/**
+ * @swagger
+ * /data/voting/{id}:
+ *   delete:
+ *     summary: DELETE Voting Data
+ *     tags: [Voting Data]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.delete('/:id', authenticate, authorize('manage:locations'), votingController.deleteVotingData);
 
 export default router;

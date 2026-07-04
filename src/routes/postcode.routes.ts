@@ -6,10 +6,100 @@ import { CreatePostcodeDto, UpdatePostcodeDto } from '@/dto/postcode.dto';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /postcodes:
+ *   get:
+ *     summary: GET Postcode
+ *     tags: [Postcode]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/', postcodeController.getAllPostcodes);
+/**
+ * @swagger
+ * /postcodes/{id}:
+ *   get:
+ *     summary: GET Postcode
+ *     tags: [Postcode]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/:id', postcodeController.getPostcodeById);
+/**
+ * @swagger
+ * /postcodes/code/{code}:
+ *   get:
+ *     summary: GET Postcode
+ *     tags: [Postcode]
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/code/:code', postcodeController.getPostcodeByCode);
 
+/**
+ * @swagger
+ * /postcodes:
+ *   post:
+ *     summary: POST Postcode
+ *     tags: [Postcode]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       201:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post(
   '/',
   authenticate,
@@ -18,6 +108,36 @@ router.post(
   postcodeController.createPostcode,
 );
 
+/**
+ * @swagger
+ * /postcodes/{id}:
+ *   put:
+ *     summary: PUT Postcode
+ *     tags: [Postcode]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.put(
   '/:id',
   authenticate,
@@ -26,6 +146,30 @@ router.put(
   postcodeController.updatePostcode,
 );
 
+/**
+ * @swagger
+ * /postcodes/{id}:
+ *   delete:
+ *     summary: DELETE Postcode
+ *     tags: [Postcode]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Internal server error
+ */
 router.delete(
   '/:id',
   authenticate,
