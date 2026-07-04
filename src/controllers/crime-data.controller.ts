@@ -14,12 +14,13 @@ export const getAllCrimeData = async (
     crimeType: req.query.crimeType as string,
   };
 
-  const result = await crimeService.getAllCrimeData(page, limit, filter);
+  const { data, pagination } = await crimeService.getAllCrimeData(page, limit, filter);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Crime data records fetched successfully',
   };
   res.status(200).json(response);

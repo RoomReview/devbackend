@@ -11,24 +11,16 @@ import {
 import { findBlogCategoryById } from '@/repositories/blog-category.repository';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { CreateBlogPostDto, UpdateBlogPostDto } from '@/dto/blog-post.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { BlogStatus } from '@/generated/prisma/enums';
 
 export const getAllBlogPosts = async (page: number, limit: number, filter?: FindBlogPostsFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllBlogPosts(limit, offset, filter);
-  const total = await countBlogPosts(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllBlogPosts(limit, offset, filter),
+    countBlogPosts(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getBlogPostById = async (id: string) => {

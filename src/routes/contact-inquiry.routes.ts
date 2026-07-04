@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as contactInquiryController from '@controllers/contact-inquiry.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateContactInquiryDto, UpdateContactInquiryStatusDto } from '@/dto/contact-inquiry.dto';
 
 const router = Router();
@@ -94,7 +95,7 @@ router.use(authenticate, authorize('view:users:all'));
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', contactInquiryController.getAllInquiries);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), contactInquiryController.getAllInquiries);
 /**
  * @swagger
  * /contact-inquiries/{id}:

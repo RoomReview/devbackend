@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as experienceController from '@controllers/experience.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateExperienceDto, UpdateExperienceDto, UpdateExperienceStatusDto } from '@/dto/experience.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', experienceController.getAllExperiences);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), experienceController.getAllExperiences);
 /**
  * @swagger
  * /experiences/{id}:

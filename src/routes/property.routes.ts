@@ -3,6 +3,7 @@ import * as propertyController from '@controllers/property.controller';
 import * as propertyImageController from '@controllers/property-image.controller';
 import { authenticate } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreatePropertyDto, UpdatePropertyDto } from '@/dto/property.dto';
 import { CreatePropertyImageDto, UpdatePropertyImageDto } from '@/dto/property-image.dto';
 
@@ -70,7 +71,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  */
-router.get('/', propertyController.getAllProperties);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), propertyController.getAllProperties);
 
 /**
  * @swagger

@@ -19,12 +19,13 @@ export const getAllExperiences = async (
     authorId: req.query.authorId as string,
   };
 
-  const result = await experienceService.getAllExperiences(page, limit, filter);
+  const { data, pagination } = await experienceService.getAllExperiences(page, limit, filter);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Experiences fetched successfully',
   };
   res.status(200).json(response);

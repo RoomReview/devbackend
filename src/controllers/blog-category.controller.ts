@@ -7,12 +7,13 @@ export const getAllBlogCategories = async (
   _req: Request,
   res: Response,
 ): Promise<void> => {
-  const result = await blogCategoryService.getAllBlogCategories();
+  const { data, pagination } = await blogCategoryService.getAllBlogCategories();
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Blog categories fetched successfully',
   };
   res.status(200).json(response);

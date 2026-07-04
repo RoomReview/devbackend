@@ -10,23 +10,15 @@ import {
 } from '@/repositories/demography.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreateDemographyDto, UpdateDemographyDto } from '@/dto/demography.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
 export const getAllDemography = async (page: number, limit: number, filter?: FindDemographyFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllDemography(limit, offset, filter);
-  const total = await countDemography(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllDemography(limit, offset, filter),
+    countDemography(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getDemographyById = async (id: string) => {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as votingController from '@controllers/voting-data.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateVotingDataDto, UpdateVotingDataDto } from '@/dto/voting-data.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', votingController.getAllVotingData);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), votingController.getAllVotingData);
 /**
  * @swagger
  * /data/voting/{id}:

@@ -59,12 +59,13 @@ export const getUserDownloads = async (
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
 
-  const result = await downloadService.getUserDownloads(userId, page, limit);
+  const { data, pagination } = await downloadService.getUserDownloads(userId, page, limit);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'User downloads fetched successfully',
   };
   res.status(200).json(response);

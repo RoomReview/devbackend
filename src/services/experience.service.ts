@@ -10,24 +10,16 @@ import {
 import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/custom-error';
 import { findPostcodeById } from '@/repositories/postcode.repository';
 import type { CreateExperienceDto, UpdateExperienceDto, UpdateExperienceStatusDto } from '@/dto/experience.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { ExperienceStatus, UserRole } from '@/generated/prisma/enums';
 
 export const getAllExperiences = async (page: number, limit: number, filter?: FindExperiencesFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllExperiences(limit, offset, filter);
-  const total = await countExperiences(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllExperiences(limit, offset, filter),
+    countExperiences(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getExperienceById = async (id: string) => {

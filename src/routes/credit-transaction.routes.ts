@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as creditController from '@controllers/credit-transaction.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateCreditTransactionDto } from '@/dto/credit-transaction.dto';
 
 const router = Router();
@@ -148,6 +149,6 @@ router.get('/:id', creditController.getTransactionById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/user/:userId', creditController.getUserTransactions);
+router.get('/user/:userId', validateRequest({ query: PaginationQueryDto }), creditController.getUserTransactions);
 
 export default router;

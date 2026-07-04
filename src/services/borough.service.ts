@@ -9,31 +9,15 @@ import {
 } from '@/repositories/borough.repository';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { CreateBoroughDto, UpdateBoroughDto } from '@/dto/borough.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
-export const getAllBoroughs = async (page?: number, limit?: number) => {
-  if (page && limit) {
-    const { offset } = paginate(page, limit);
-    const boroughs = await findAllBoroughs(limit, offset);
-    const total = await countBoroughs();
-    const totalPages = Math.ceil(total / limit);
-    
-    return {
-      data: boroughs,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-      },
-    };
-  }
-
-  const boroughs = await findAllBoroughs();
-  return {
-    data: boroughs,
-    pagination: null,
-  };
+export const getAllBoroughs = async (page: number, limit: number) => {
+  const { offset } = paginate(page, limit);
+  const [boroughs, total] = await Promise.all([
+    findAllBoroughs(limit, offset),
+    countBoroughs(),
+  ]);
+  return buildPaginatedResult(boroughs, total, page, limit);
 };
 
 export const getBoroughById = async (id: string) => {

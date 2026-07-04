@@ -10,23 +10,15 @@ import {
 } from '@/repositories/property-value-data.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreatePropertyValueDataDto, UpdatePropertyValueDataDto } from '@/dto/property-value-data.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
 export const getAllPropertyValueData = async (page: number, limit: number, filter?: FindPropertyValueDataFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllPropertyValueData(limit, offset, filter);
-  const total = await countPropertyValueData(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllPropertyValueData(limit, offset, filter),
+    countPropertyValueData(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getPropertyValueDataById = async (id: string) => {

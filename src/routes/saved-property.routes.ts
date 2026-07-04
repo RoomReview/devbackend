@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as savedPropertyController from '@controllers/saved-property.controller';
 import { authenticate } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { SavePropertyDto } from '@/dto/saved-property.dto';
 
 const router = Router();
@@ -46,7 +47,7 @@ router.use(authenticate); // Require authentication for all saved property endpo
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', savedPropertyController.getSavedProperties);
+router.get('/', validateRequest({ query: PaginationQueryDto }), savedPropertyController.getSavedProperties);
 /**
  * @swagger
  * /saved-properties:

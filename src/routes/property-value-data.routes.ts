@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as valController from '@controllers/property-value-data.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreatePropertyValueDataDto, UpdatePropertyValueDataDto } from '@/dto/property-value-data.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', valController.getAllPropertyValueData);
+router.get('/', validateRequest({ query: PaginationQueryDto }), valController.getAllPropertyValueData);
 /**
  * @swagger
  * /data/property-values/{id}:

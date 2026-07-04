@@ -18,12 +18,13 @@ export const getAllReviews = async (
     status: req.query.status as ReviewStatus,
   };
 
-  const paginatedResult = await reviewService.getAllReviews(page, limit, filter);
+  const { data, pagination } = await reviewService.getAllReviews(page, limit, filter);
 
-  const response: ApiResponse<typeof paginatedResult> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: paginatedResult,
+    data,
+    pagination,
     message: 'Reviews fetched successfully',
   };
   res.status(200).json(response);

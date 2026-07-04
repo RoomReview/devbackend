@@ -43,12 +43,13 @@ export const getAllInquiries = async (
   const limit = Number(req.query.limit) || 10;
   const status = req.query.status as InquiryStatus;
 
-  const result = await contactInquiryService.getAllInquiries(page, limit, status);
+  const { data, pagination } = await contactInquiryService.getAllInquiries(page, limit, status);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Contact inquiries fetched successfully',
   };
   res.status(200).json(response);

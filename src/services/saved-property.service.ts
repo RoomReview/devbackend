@@ -7,23 +7,15 @@ import {
 } from '@/repositories/saved-property.repository';
 import { findPropertyById } from '@/repositories/property.repository';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
 export const getSavedPropertiesByUser = async (userId: string, page: number, limit: number) => {
   const { offset } = paginate(page, limit);
-  const items = await findSavedPropertiesByUserId(userId, limit, offset);
-  const total = await countSavedPropertiesByUserId(userId);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findSavedPropertiesByUserId(userId, limit, offset),
+    countSavedPropertiesByUserId(userId),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const savePropertyForUser = async (userId: string, propertyId: string) => {

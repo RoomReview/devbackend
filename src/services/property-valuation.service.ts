@@ -7,7 +7,7 @@ import {
 import { getUserCreditsByUserId } from '@/services/user-credits.service';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { CreatePropertyValuationDto } from '@/dto/property-valuation.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { TransactionType, PropertyCondition } from '@/generated/prisma/enums';
 import prisma from '@config/database';
 
@@ -115,17 +115,9 @@ export const getValuationById = async (id: string) => {
 export const getUserValuations = async (userId: string, page: number, limit: number) => {
   const credits = await getUserCreditsByUserId(userId);
   const { offset } = paginate(page, limit);
-  const items = await findAllPropertyValuationsByUserCreditsId(credits.userCreditsId, limit, offset);
-  const total = await countPropertyValuationsByUserCreditsId(credits.userCreditsId);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllPropertyValuationsByUserCreditsId(credits.userCreditsId, limit, offset),
+    countPropertyValuationsByUserCreditsId(credits.userCreditsId),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };

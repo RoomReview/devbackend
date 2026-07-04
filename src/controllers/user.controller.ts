@@ -25,15 +25,16 @@ export const getAllUsers = async (
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   
-  const { users } = await userService.findAllUsers({
+  const { data, pagination } = await userService.findAllUsers({
     page,
     limit,
   });
 
-  const response: ApiResponse<{ users: typeof users }> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: { users },
+    data,
+    pagination,
     message: 'Users fetched successfully',
   };
   res.status(200).json(response);

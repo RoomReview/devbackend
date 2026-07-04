@@ -7,12 +7,13 @@ export const getAllBlogTags = async (
   _req: Request,
   res: Response,
 ): Promise<void> => {
-  const result = await blogTagService.getAllBlogTags();
+  const { data, pagination } = await blogTagService.getAllBlogTags();
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Blog tags fetched successfully',
   };
   res.status(200).json(response);

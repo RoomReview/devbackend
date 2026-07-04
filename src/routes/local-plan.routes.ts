@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as planController from '@controllers/local-plan.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateLocalPlanDto, UpdateLocalPlanDto } from '@/dto/local-plan.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', planController.getAllLocalPlans);
+router.get('/', validateRequest({ query: PaginationQueryDto }), planController.getAllLocalPlans);
 /**
  * @swagger
  * /local-plans/{id}:

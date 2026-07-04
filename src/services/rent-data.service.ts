@@ -10,23 +10,15 @@ import {
 } from '@/repositories/rent-data.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreateRentDataDto, UpdateRentDataDto } from '@/dto/rent-data.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
 export const getAllRentData = async (page: number, limit: number, filter?: FindRentDataFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllRentData(limit, offset, filter);
-  const total = await countRentData(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllRentData(limit, offset, filter),
+    countRentData(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getRentDataById = async (id: string) => {

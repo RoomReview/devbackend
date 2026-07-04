@@ -8,7 +8,7 @@ import {
 } from '@/repositories/contact-inquiry.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreateContactInquiryDto, UpdateContactInquiryStatusDto } from '@/dto/contact-inquiry.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { InquiryStatus } from '@/generated/prisma/enums';
 
 export const submitInquiry = async (data: CreateContactInquiryDto) => {
@@ -34,19 +34,11 @@ export const getInquiryById = async (id: string) => {
 
 export const getAllInquiries = async (page: number, limit: number, status?: InquiryStatus) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllInquiries(limit, offset, status);
-  const total = await countInquiries(status);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllInquiries(limit, offset, status),
+    countInquiries(status),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const updateInquiryStatus = async (id: string, data: UpdateContactInquiryStatusDto) => {

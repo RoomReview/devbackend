@@ -111,6 +111,14 @@ export const findAllUsers = async (limit: number, offset: number) => {
   });
 };
 
+export const countUsers = async () => {
+  return await prisma.user.count().catch(err => {
+    logContext.function = 'countUsers';
+    logger.error(logContext, 'Error in countUsers repository', { error: err });
+    throw new Error('DB: countUsers operation failed');
+  });
+};
+
 export const findUserById = async (userId: string, select?: UserSelect) => {
   return await prisma.user.findUnique({ where: { userId }, select }).catch(err => {
     logContext.function = 'findUserById';

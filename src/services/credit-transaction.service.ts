@@ -6,7 +6,7 @@ import {
 import { getUserCreditsByUserId, deductCredits, addCredits } from '@/services/user-credits.service';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreateCreditTransactionDto } from '@/dto/credit-transaction.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { TransactionType } from '@/generated/prisma/enums';
 
 export const createCreditTransaction = async (data: CreateCreditTransactionDto) => {
@@ -37,17 +37,9 @@ export const getTransactionById = async (id: string) => {
 export const getUserTransactions = async (userId: string, page: number, limit: number) => {
   const credits = await getUserCreditsByUserId(userId);
   const { offset } = paginate(page, limit);
-  const items = await findAllTransactionsByUserCreditsId(credits.userCreditsId, limit, offset);
-  const total = await countTransactionsByUserCreditsId(credits.userCreditsId);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllTransactionsByUserCreditsId(credits.userCreditsId, limit, offset),
+    countTransactionsByUserCreditsId(credits.userCreditsId),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };

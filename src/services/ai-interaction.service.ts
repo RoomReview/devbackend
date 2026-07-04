@@ -7,7 +7,7 @@ import {
 import { getUserCreditsByUserId } from '@/services/user-credits.service';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { CreateAIInteractionDto } from '@/dto/ai-interaction.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { TransactionType } from '@/generated/prisma/enums';
 import prisma from '@config/database';
 
@@ -87,17 +87,9 @@ export const getInteractionById = async (id: string) => {
 export const getUserInteractions = async (userId: string, page: number, limit: number) => {
   const credits = await getUserCreditsByUserId(userId);
   const { offset } = paginate(page, limit);
-  const items = await findAllAIInteractionsByUserCreditsId(credits.userCreditsId, limit, offset);
-  const total = await countAIInteractionsByUserCreditsId(credits.userCreditsId);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllAIInteractionsByUserCreditsId(credits.userCreditsId, limit, offset),
+    countAIInteractionsByUserCreditsId(credits.userCreditsId),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };

@@ -13,12 +13,13 @@ export const getAllPropertyValueData = async (
     postcode: req.query.postcode as string,
   };
 
-  const result = await valService.getAllPropertyValueData(page, limit, filter);
+  const { data, pagination } = await valService.getAllPropertyValueData(page, limit, filter);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Property value data records fetched successfully',
   };
   res.status(200).json(response);

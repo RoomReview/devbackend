@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as downloadController from '@controllers/download-history.controller';
 import { authenticate } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateDownloadHistoryDto } from '@/dto/download-history.dto';
 
 const router = Router();
@@ -142,6 +143,6 @@ router.get('/:id', downloadController.getDownloadById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/user/:userId', downloadController.getUserDownloads);
+router.get('/user/:userId', validateRequest({ query: PaginationQueryDto }), downloadController.getUserDownloads);
 
 export default router;

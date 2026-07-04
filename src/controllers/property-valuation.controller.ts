@@ -59,12 +59,13 @@ export const getUserValuations = async (
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
 
-  const result = await valuationService.getUserValuations(userId, page, limit);
+  const { data, pagination } = await valuationService.getUserValuations(userId, page, limit);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
     data,
+    pagination,
     message: 'User property valuations fetched successfully',
   };
   res.status(200).json(response);

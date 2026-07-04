@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as valuationController from '@controllers/property-valuation.controller';
 import { authenticate } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreatePropertyValuationDto } from '@/dto/property-valuation.dto';
 
 const router = Router();
@@ -142,6 +143,6 @@ router.get('/:id', valuationController.getValuationById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/user/:userId', valuationController.getUserValuations);
+router.get('/user/:userId', validateRequest({ query: PaginationQueryDto }), valuationController.getUserValuations);
 
 export default router;

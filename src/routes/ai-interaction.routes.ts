@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as aiController from '@controllers/ai-interaction.controller';
 import { authenticate } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateAIInteractionDto } from '@/dto/ai-interaction.dto';
 
 const router = Router();
@@ -142,6 +143,6 @@ router.get('/:id', aiController.getInteractionById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/user/:userId', aiController.getUserInteractions);
+router.get('/user/:userId', validateRequest({ query: PaginationQueryDto }), aiController.getUserInteractions);
 
 export default router;

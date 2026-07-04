@@ -11,12 +11,13 @@ export const getSavedProperties = async (
   const limit = Number(req.query.limit) || 10;
   const userId = req.user!.userId;
 
-  const result = await savedPropertyService.getSavedPropertiesByUser(userId, page, limit);
+  const { data, pagination } = await savedPropertyService.getSavedPropertiesByUser(userId, page, limit);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Saved properties fetched successfully',
   };
   res.status(200).json(response);

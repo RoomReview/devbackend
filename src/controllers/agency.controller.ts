@@ -10,12 +10,13 @@ export const getAllAgencies = async (
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
 
-  const result = await agencyService.getAllAgencies(page, limit);
+  const { data, pagination } = await agencyService.getAllAgencies(page, limit);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Agencies fetched successfully',
   };
   res.status(200).json(response);

@@ -9,23 +9,15 @@ import {
 } from '@/repositories/local-plan.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreateLocalPlanDto, UpdateLocalPlanDto } from '@/dto/local-plan.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
 export const getAllLocalPlans = async (page: number, limit: number, filter?: FindLocalPlansFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllLocalPlans(limit, offset, filter);
-  const total = await countLocalPlans(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllLocalPlans(limit, offset, filter),
+    countLocalPlans(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getLocalPlanById = async (id: string) => {

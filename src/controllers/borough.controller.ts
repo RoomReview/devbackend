@@ -7,15 +7,16 @@ export const getAllBoroughs = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const page = req.query.page ? Number(req.query.page) : undefined;
-  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
 
-  const result = await boroughService.getAllBoroughs(page, limit);
+  const { data, pagination } = await boroughService.getAllBoroughs(page, limit);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Boroughs fetched successfully',
   };
   res.status(200).json(response);

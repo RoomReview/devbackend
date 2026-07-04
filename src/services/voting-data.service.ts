@@ -10,23 +10,15 @@ import {
 } from '@/repositories/voting-data.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreateVotingDataDto, UpdateVotingDataDto } from '@/dto/voting-data.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
 export const getAllVotingData = async (page: number, limit: number, filter?: FindVotingDataFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllVotingData(limit, offset, filter);
-  const total = await countVotingData(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllVotingData(limit, offset, filter),
+    countVotingData(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getVotingDataById = async (id: string) => {

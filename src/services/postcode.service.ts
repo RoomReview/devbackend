@@ -10,24 +10,16 @@ import {
 } from '@/repositories/postcode.repository';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { CreatePostcodeDto, UpdatePostcodeDto } from '@/dto/postcode.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { findBoroughById } from '@/repositories/borough.repository';
 
 export const getAllPostcodes = async (page: number, limit: number, filter?: FindPostcodesFilter) => {
   const { offset } = paginate(page, limit);
-  const postcodes = await findAllPostcodes(limit, offset, filter);
-  const total = await countPostcodes(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: postcodes,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [postcodes, total] = await Promise.all([
+    findAllPostcodes(limit, offset, filter),
+    countPostcodes(filter),
+  ]);
+  return buildPaginatedResult(postcodes, total, page, limit);
 };
 
 export const getPostcodeById = async (id: string) => {

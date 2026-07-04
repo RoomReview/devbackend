@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as reviewController from '@controllers/review.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateReviewDto, UpdateReviewDto, UpdateReviewStatusDto } from '@/dto/review.dto';
 
 /**
@@ -52,7 +53,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  */
-router.get('/', reviewController.getAllReviews);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), reviewController.getAllReviews);
 
 /**
  * @swagger

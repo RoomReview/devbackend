@@ -9,7 +9,7 @@ import {
 } from '@/repositories/newsletter.repository';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { SubscribeNewsletterDto, ConfirmNewsletterDto } from '@/dto/newsletter.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { randomUUID } from 'node:crypto';
 
 export const subscribeToNewsletter = async (data: SubscribeNewsletterDto) => {
@@ -66,17 +66,9 @@ export const unsubscribeFromNewsletter = async (email: string) => {
 
 export const getAllSubscribers = async (page: number, limit: number) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllSubscribers(limit, offset);
-  const total = await countSubscribers();
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllSubscribers(limit, offset),
+    countSubscribers(),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };

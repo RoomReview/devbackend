@@ -7,7 +7,7 @@ import {
 import { getUserCreditsByUserId } from '@/services/user-credits.service';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { CreateDownloadHistoryDto } from '@/dto/download-history.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { TransactionType } from '@/generated/prisma/enums';
 import prisma from '@config/database';
 
@@ -71,17 +71,9 @@ export const getDownloadById = async (id: string) => {
 export const getUserDownloads = async (userId: string, page: number, limit: number) => {
   const credits = await getUserCreditsByUserId(userId);
   const { offset } = paginate(page, limit);
-  const items = await findAllDownloadHistoryByUserCreditsId(credits.userCreditsId, limit, offset);
-  const total = await countDownloadHistoryByUserCreditsId(credits.userCreditsId);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllDownloadHistoryByUserCreditsId(credits.userCreditsId, limit, offset),
+    countDownloadHistoryByUserCreditsId(credits.userCreditsId),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };

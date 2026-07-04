@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as blogCategoryController from '@controllers/blog-category.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateBlogCategoryDto, UpdateBlogCategoryDto } from '@/dto/blog-category.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', blogCategoryController.getAllBlogCategories);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), blogCategoryController.getAllBlogCategories);
 /**
  * @swagger
  * /blog/categories/{id}:

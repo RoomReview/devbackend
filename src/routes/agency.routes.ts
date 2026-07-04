@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as agencyController from '@controllers/agency.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateAgencyDto, UpdateAgencyDto, VerifyAgencyDto } from '@/dto/agency.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', agencyController.getAllAgencies);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), agencyController.getAllAgencies);
 /**
  * @swagger
  * /agencies/{id}:

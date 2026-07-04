@@ -8,6 +8,7 @@ import {
 import { validateRequest } from '@/middleware/validation.middleware';
 import { ChangePasswordDto } from '@/dto/user.dto';
 import { UpdateUserProfileDto } from '@/dto/update-user.dto';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 
 /**
  * @swagger
@@ -71,6 +72,7 @@ router.get(
   '/',
   authenticate,
   authorize('view:users:all'),
+  validateRequest({ query: PaginationQueryDto }),
   userController.getAllUsers,
 );
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as postcodeController from '@controllers/postcode.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreatePostcodeDto, UpdatePostcodeDto } from '@/dto/postcode.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', postcodeController.getAllPostcodes);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), postcodeController.getAllPostcodes);
 /**
  * @swagger
  * /postcodes/{id}:

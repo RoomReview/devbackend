@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as newsletterController from '@controllers/newsletter.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { SubscribeNewsletterDto, ConfirmNewsletterDto } from '@/dto/newsletter.dto';
 
 const router = Router();
@@ -184,6 +185,7 @@ router.get(
   '/subscribers',
   authenticate,
   authorize('view:users:all'),
+  validateRequest({ query: PaginationQueryDto }),
   newsletterController.getAllSubscribers,
 );
 

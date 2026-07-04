@@ -15,12 +15,13 @@ export const getAllLocalPlans = async (
     status: req.query.status as string,
   };
 
-  const result = await planService.getAllLocalPlans(page, limit, filter);
+  const { data, pagination } = await planService.getAllLocalPlans(page, limit, filter);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Local plans fetched successfully',
   };
   res.status(200).json(response);

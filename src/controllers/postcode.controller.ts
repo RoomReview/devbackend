@@ -15,12 +15,13 @@ export const getAllPostcodes = async (
     boroughId: req.query.boroughId as string,
   };
 
-  const result = await postcodeService.getAllPostcodes(page, limit, filter);
+  const { data, pagination } = await postcodeService.getAllPostcodes(page, limit, filter);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Postcodes fetched successfully',
   };
   res.status(200).json(response);

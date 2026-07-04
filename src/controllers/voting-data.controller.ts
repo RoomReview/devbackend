@@ -15,12 +15,13 @@ export const getAllVotingData = async (
     party: req.query.party as string,
   };
 
-  const result = await votingService.getAllVotingData(page, limit, filter);
+  const { data, pagination } = await votingService.getAllVotingData(page, limit, filter);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Voting data records fetched successfully',
   };
   res.status(200).json(response);

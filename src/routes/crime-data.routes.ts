@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as crimeController from '@controllers/crime-data.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 import { CreateCrimeDataDto, UpdateCrimeDataDto } from '@/dto/crime-data.dto';
 
 const router = Router();
@@ -44,7 +45,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', crimeController.getAllCrimeData);
+router.get('/', validateRequest({ query: PaginationQueryDto }), validateRequest({ query: PaginationQueryDto }), crimeController.getAllCrimeData);
 /**
  * @swagger
  * /data/crime/{id}:

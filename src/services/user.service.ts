@@ -5,7 +5,7 @@ import { ChangePasswordDto } from '@/dto/user.dto';
 import { UpdateUserProfileDto } from '@/dto/update-user.dto';
 import { EntityNotFoundError, UnauthorizedError } from '@/utils/custom-error';
 import { comparePassword, hashPassword } from '@/utils/password';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import prisma from '@config/database';
 import { UserRole } from '@/generated/prisma/enums';
 import {
@@ -35,8 +35,11 @@ const defaultSelectFields: UserSelect = {
 export const findAllUsers = async (data: PaginateArgs) => {
   const { page, limit } = data;
   const { offset } = paginate(page, limit);
-  const users = await userDal.findAllUsers(limit, offset);
-  return { users };
+  const [users, total] = await Promise.all([
+    userDal.findAllUsers(limit, offset),
+    userDal.countUsers(),
+  ]);
+  return buildPaginatedResult(users, total, page, limit);
 };
 
 export const findUserById = async (

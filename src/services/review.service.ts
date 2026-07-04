@@ -11,24 +11,16 @@ import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/cu
 import { findPostcodeById } from '@/repositories/postcode.repository';
 import { findBoroughById } from '@/repositories/borough.repository';
 import type { CreateReviewDto, UpdateReviewDto, UpdateReviewStatusDto } from '@/dto/review.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { ReviewStatus, UserRole } from '@/generated/prisma/enums';
 
 export const getAllReviews = async (page: number, limit: number, filter?: FindReviewsFilter) => {
   const { offset } = paginate(page, limit);
-  const reviews = await findAllReviews(limit, offset, filter);
-  const total = await countReviews(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: reviews,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [reviews, total] = await Promise.all([
+    findAllReviews(limit, offset, filter),
+    countReviews(filter),
+  ]);
+  return buildPaginatedResult(reviews, total, page, limit);
 };
 
 export const getReviewById = async (id: string) => {

@@ -22,12 +22,13 @@ export const getAllProperties = async (
     bedrooms: req.query.bedrooms ? Number(req.query.bedrooms) : undefined,
   };
 
-  const paginatedResult = await propertyService.getAllProperties(page, limit, filter);
+  const { data, pagination } = await propertyService.getAllProperties(page, limit, filter);
 
-  const response: ApiResponse<typeof paginatedResult> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: paginatedResult,
+    data,
+    pagination,
     message: 'Properties fetched successfully',
   };
   res.status(200).json(response);

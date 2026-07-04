@@ -10,25 +10,17 @@ import {
 } from '@/repositories/property.repository';
 import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/custom-error';
 import type { CreatePropertyDto, UpdatePropertyDto } from '@/dto/property.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { PropertyStatus, UserRole } from '@/generated/prisma/enums';
 import { findPostcodeById } from '@/repositories/postcode.repository';
 
 export const getAllProperties = async (page: number, limit: number, filter?: FindPropertiesFilter) => {
   const { offset } = paginate(page, limit);
-  const properties = await findAllProperties(limit, offset, filter);
-  const total = await countProperties(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: properties,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [properties, total] = await Promise.all([
+    findAllProperties(limit, offset, filter),
+    countProperties(filter),
+  ]);
+  return buildPaginatedResult(properties, total, page, limit);
 };
 
 export const getPropertyById = async (id: string) => {

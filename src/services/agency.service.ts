@@ -13,24 +13,16 @@ import {
 } from '@/repositories/agencies.repository';
 import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/custom-error';
 import type { CreateAgencyDto, UpdateAgencyDto, VerifyAgencyDto } from '@/dto/agency.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { UserRole } from '@/generated/prisma/enums';
 
 export const getAllAgencies = async (page: number, limit: number) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllAgencies(limit, offset);
-  const total = await countAgencies();
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllAgencies(limit, offset),
+    countAgencies(),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getAgencyById = async (id: string) => {

@@ -10,23 +10,15 @@ import {
 } from '@/repositories/crime-data.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import type { CreateCrimeDataDto, UpdateCrimeDataDto } from '@/dto/crime-data.dto';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 
 export const getAllCrimeData = async (page: number, limit: number, filter?: FindCrimeDataFilter) => {
   const { offset } = paginate(page, limit);
-  const items = await findAllCrimeData(limit, offset, filter);
-  const total = await countCrimeData(filter);
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  const [items, total] = await Promise.all([
+    findAllCrimeData(limit, offset, filter),
+    countCrimeData(filter),
+  ]);
+  return buildPaginatedResult(items, total, page, limit);
 };
 
 export const getCrimeDataById = async (id: string) => {

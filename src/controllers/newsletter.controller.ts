@@ -55,12 +55,13 @@ export const getAllSubscribers = async (
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
 
-  const result = await newsletterService.getAllSubscribers(page, limit);
+  const { data, pagination } = await newsletterService.getAllSubscribers(page, limit);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Subscribers fetched successfully',
   };
   res.status(200).json(response);

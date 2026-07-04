@@ -17,12 +17,13 @@ export const getAllBlogPosts = async (
     status: req.query.status as BlogStatus,
   };
 
-  const result = await blogPostService.getAllBlogPosts(page, limit, filter);
+  const { data, pagination } = await blogPostService.getAllBlogPosts(page, limit, filter);
 
-  const response: ApiResponse<typeof result> = {
+  const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
-    data: result,
+    data,
+    pagination,
     message: 'Blog posts fetched successfully',
   };
   res.status(200).json(response);
