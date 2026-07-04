@@ -47,6 +47,10 @@ const router = Router();
  *     responses:
  *       200:
  *         description: List of reviews
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get('/', reviewController.getAllReviews);
 
@@ -65,6 +69,10 @@ router.get('/', reviewController.getAllReviews);
  *     responses:
  *       200:
  *         description: Review found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get('/:id', reviewController.getReviewById);
 
@@ -85,6 +93,10 @@ router.get('/:id', reviewController.getReviewById);
  *     responses:
  *       201:
  *         description: Review created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/',
@@ -116,6 +128,10 @@ router.post(
  *     responses:
  *       200:
  *         description: Review updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.put(
   '/:id',
@@ -147,6 +163,10 @@ router.put(
  *     responses:
  *       200:
  *         description: Review status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.patch(
   '/:id/status',
@@ -173,6 +193,10 @@ router.patch(
  *     responses:
  *       200:
  *         description: Review deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.delete('/:id', authenticate, reviewController.deleteReview);
 

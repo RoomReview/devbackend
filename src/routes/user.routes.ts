@@ -62,6 +62,10 @@ const router = Router();
  *     responses:
  *       200:
  *         description: List of users fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get(
   '/',
@@ -86,6 +90,10 @@ router.get(
  *     responses:
  *       200:
  *         description: User found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get('/:id', userController.getUserById);
 
@@ -98,6 +106,10 @@ router.get('/:id', userController.getUserById);
  *     responses:
  *       201:
  *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post('/', userController.createUser);
 
@@ -117,6 +129,10 @@ router.post('/', userController.createUser);
  *     responses:
  *       200:
  *         description: User updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.put(
   '/:id',
@@ -142,6 +158,10 @@ router.put(
  *     responses:
  *       200:
  *         description: User deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.delete(
   '/:id',
@@ -174,6 +194,10 @@ router.delete(
  *     responses:
  *       200:
  *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/:userId/change-password',

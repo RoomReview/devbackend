@@ -108,6 +108,10 @@ router.get(
  *     responses:
  *       200:
  *         description: Renders failure message or redirects
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get('/failure', ssoController.ssoFailure);
 
@@ -122,6 +126,10 @@ router.get('/failure', ssoController.ssoFailure);
  *     responses:
  *       200:
  *         description: User logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get('/logout', authenticate, ssoController.ssoLogout);
 
@@ -136,6 +144,10 @@ router.get('/logout', authenticate, ssoController.ssoLogout);
  *     responses:
  *       200:
  *         description: User profile fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get('/me', authenticate, authController.getMe);
 
