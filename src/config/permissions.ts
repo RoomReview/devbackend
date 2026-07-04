@@ -7,4 +7,5 @@ export const permissions = {
   'view:users:self': [UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT],
   'approve:reviews': [UserRole.ADMIN],
   'manage:properties': [UserRole.ADMIN],
+  'manage:locations': [UserRole.ADMIN],
 } as const;

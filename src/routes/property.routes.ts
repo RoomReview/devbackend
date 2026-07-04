@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import * as propertyController from '@controllers/property.controller';
+import * as propertyImageController from '@controllers/property-image.controller';
 import { authenticate } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { CreatePropertyDto, UpdatePropertyDto } from '@/dto/property.dto';
+import { CreatePropertyImageDto, UpdatePropertyImageDto } from '@/dto/property-image.dto';
 
 /**
  * @swagger
@@ -159,5 +161,28 @@ router.put(
  *         description: Property deleted successfully
  */
 router.delete('/:id', authenticate, propertyController.deleteProperty);
+
+// Nested PropertyImage routes
+router.get('/:propertyId/images', propertyImageController.getImagesByPropertyId);
+
+router.post(
+  '/:propertyId/images',
+  authenticate,
+  validateRequest({ body: CreatePropertyImageDto }),
+  propertyImageController.createImage,
+);
+
+router.put(
+  '/:propertyId/images/:imageId',
+  authenticate,
+  validateRequest({ body: UpdatePropertyImageDto }),
+  propertyImageController.updateImage,
+);
+
+router.delete(
+  '/:propertyId/images/:imageId',
+  authenticate,
+  propertyImageController.deleteImage,
+);
 
 export default router;
