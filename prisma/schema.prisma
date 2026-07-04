@@ -13,11 +13,18 @@ datasource db {
   provider = "postgresql"
 }
 
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
 model User {
   userId           String    @id @default(uuid(7)) @map("user_id") @db.Uuid
   email            String    @unique
   firstName        String    @map("first_name")
   lastName         String    @map("last_name")
+  phone            String?   @map("phone")
+  avatar           String?   @map("avatar")
+  bio              String?   @map("bio")
   passwordHash     String?   @map("password_hash")
   isEmailVerified  Boolean   @default(false) @map("is_email_verified")
   isActive         Boolean   @default(true) @map("is_active")
@@ -30,9 +37,17 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  agencies UserAgency[]
-  session  Session?
+  // Relations
+  agencies        UserAgency[]
+  session         Session?
+  properties      Property[]
+  savedProperties SavedProperty[]
+  experiences     Experience[]
+  reviews         Review[]
+  credits         UserCredits?
 
+  @@index([email])
+  @@index([role])
   @@map("users")
 }
 
@@ -90,25 +105,597 @@ model UserAgency {
   @@map("user_agency")
 }
 
-model Area {
-  areaId       String   @id @default(uuid(7)) @map("area_id") @db.Uuid
-  parentAreaId String?  @map("parent_area_id") @db.Uuid
-  areaType     AreaType @map("area_type")
-  name         String
+// ============================================
+// LOCATION DATA
+// ============================================
+
+model Borough {
+  boroughId   String   @id @default(uuid(7)) @map("borough_id")
+  name        String   @unique
+  slug        String   @unique
+  description String?  @db.Text
+  image       String?
+  latitude    Float?
+  longitude   Float?
+  metrics     Json     @default("{}") @map("metrics")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  postcodes   Postcode[]
+  reviews     Review[]
+
+  @@index([slug])
+  @@map("boroughs")
+}
+
+model Postcode {
+  postcodeId  String   @id @default(uuid(7)) @map("postcode_id")
+  code        String   @unique
+  outcode     String
+  incode      String
+  latitude    Float?
+  longitude   Float?
+  metrics     Json     @default("{}") @map("metrics")
+  boroughId   String?  @map("borough_id")
+  borough     Borough? @relation(fields: [boroughId], references: [boroughId], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  reviews     Review[]
+  properties  Property[]
+  experiences Experience[]
+
+  @@index([code])
+  @@index([outcode])
+  @@index([boroughId])
+  @@map("postcodes")
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+model Review {
+  reviewId        String       @id @default(uuid(7)) @map("review_id") @db.Uuid
+  title           String       @map("title")
+  content         String       @db.Text @map("content")
+  safetyRating    Int          @db.SmallInt @map("safety_rating")
+  transportRating Int          @db.SmallInt @map("transport_rating")
+  amenitiesRating Int          @db.SmallInt @map("amenities_rating")
+  valueRating     Int          @db.SmallInt @map("value_rating")
+  overallRating   Float        @map("overall_rating")
+  pros            String[]     @map("pros")
+  cons            String[]     @map("cons")
+  yearsLived      Int?         @map("years_lived")
+  anonymous       Boolean      @default(false) @map("anonymous")
+  verified        Boolean      @default(false) @map("verified")
+  status          ReviewStatus @default(PENDING) @map("status")
+  rejectionReason String?      @map("rejection_reason")
+  authorId        String       @map("author_id") @db.Uuid
+  author          User         @relation(fields: [authorId], references: [userId], onDelete: Cascade)
+  postcodeId      String?      @map("postcode_id")
+  postcode        Postcode?    @relation(fields: [postcodeId], references: [postcodeId])
+  boroughId       String?      @map("borough_id")
+  borough         Borough?     @relation(fields: [boroughId], references: [boroughId])
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  publishedAt     DateTime?    @map("published_at")
+
+  @@index([postcodeId])
+  @@index([boroughId])
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("reviews")
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================
+// PROPERTIES
+// ============================================
+
+model Property {
+  propertyId     String         @id @default(uuid(7)) @map("property_id") @db.Uuid
+  title          String         @map("title")
+  description    String         @db.Text @map("description")
+  type           PropertyType   @map("type")
+  listingType    ListingType    @map("listing_type")
+  price          Decimal        @db.Decimal(12, 2) @map("price")
+  priceFrequency PriceFrequency @default(MONTHLY) @map("price_frequency")
+  bedrooms       Int            @db.SmallInt @map("bedrooms")
+  bathrooms      Int            @db.SmallInt @map("bathrooms")
+  size           Int?           @map("size")
+  furnished      FurnishedType  @default(UNFURNISHED) @map("furnished")
+  address        String         @map("address")
+  latitude       Float?         @map("latitude")
+  longitude      Float?         @map("longitude")
+  features       String[]       @map("features")
+  availableFrom  DateTime?      @map("available_from")
+  minTenancy     String?        @map("min_tenancy")
+  deposit        Decimal?       @db.Decimal(12, 2) @map("deposit")
+  bills          BillsIncluded  @default(EXCLUDED) @map("bills")
+  epcRating      String?        @map("epc_rating")
+  floorPlan      String?        @map("floor_plan")
+  verified       Boolean        @default(false) @map("verified")
+  featured       Boolean        @default(false) @map("featured")
+  status         PropertyStatus @default(ACTIVE) @map("status")
+  viewCount      Int            @default(0) @map("view_count")
+  landlordId     String         @map("landlord_id") @db.Uuid
+  landlord       User           @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  postcodeId     String         @map("postcode_id")
+  postcode       Postcode       @relation(fields: [postcodeId], references: [postcodeId])
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  images  PropertyImage[]
+  savedBy SavedProperty[]
+
+  @@index([postcodeId])
+  @@index([landlordId])
+  @@index([listingType])
+  @@index([type])
+  @@index([status])
+  @@index([price])
+  @@index([bedrooms])
+  @@map("properties")
+}
+
+model PropertyImage {
+  propertyImageId String   @id @default(uuid(7)) @map("property_image_id") @db.Uuid
+  url             String   @map("url")
+  alt             String?  @map("alt")
+  order           Int      @default(0) @map("order")
+  propertyId      String   @map("property_id") @db.Uuid
+  property        Property @relation(fields: [propertyId], references: [propertyId], onDelete: Cascade)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([propertyId])
+  @@map("property_images")
+}
+
+model SavedProperty {
+  savedPropertyId String   @id @default(uuid(7)) @map("saved_property_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  user            User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  propertyId      String   @map("property_id") @db.Uuid
+  property        Property @relation(fields: [propertyId], references: [propertyId], onDelete: Cascade)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+  @@map("saved_properties")
+}
+
+enum PropertyType {
+  FLAT
+  HOUSE
+  ROOM
+  STUDIO
+  MAISONETTE
+  BUNGALOW
+}
+
+enum ListingType {
+  FOR_RENT
+  FOR_SALE
+}
+
+enum PriceFrequency {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum FurnishedType {
+  FURNISHED
+  UNFURNISHED
+  PART_FURNISHED
+}
+
+enum BillsIncluded {
+  INCLUDED
+  EXCLUDED
+  PARTIAL
+}
+
+enum PropertyStatus {
+  ACTIVE
+  PENDING
+  SOLD
+  LET
+  WITHDRAWN
+}
+
+// ============================================
+// EXPERIENCES (STORIES)
+// ============================================
+
+model Experience {
+  experienceId     String           @id @default(uuid(7)) @map("experience_id") @db.Uuid
+  type             ExperienceType   @map("type")
+  title            String           @map("title")
+  story            String           @db.Text @map("story")
+  landlordName     String?          @map("landlord_name")
+  agentName        String?          @map("agent_name")
+  yearOfExperience Int?             @map("year_of_experience")
+  anonymous        Boolean          @default(true) @map("anonymous")
+  contactEmail     String?          @map("contact_email")
+  status           ExperienceStatus @default(PENDING) @map("status")
+  adminNotes       String?          @db.Text @map("admin_notes")
+  authorId         String?          @map("author_id") @db.Uuid
+  author           User?            @relation(fields: [authorId], references: [userId], onDelete: SetNull)
+  postcodeId       String?          @map("postcode_id")
+  postcode         Postcode?        @relation(fields: [postcodeId], references: [postcodeId])
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  publishedAt      DateTime?        @map("published_at")
+
+  @@index([status])
+  @@index([postcodeId])
+  @@map("experiences")
+}
+
+enum ExperienceType {
+  POSITIVE
+  NEGATIVE
+  WARNING
+  NEUTRAL
+}
+
+enum ExperienceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FEATURED
+}
+
+// ============================================
+// BLOG
+// ============================================
+
+model BlogPost {
+  blogPostId      String        @id @default(uuid(7)) @map("blog_post_id") @db.Uuid
+  title           String        @map("title")
+  slug            String        @unique @map("slug")
+  excerpt         String        @db.Text @map("excerpt")
+  content         String        @db.Text @map("content")
+  featuredImage   String?       @map("featured_image")
+  readTime        Int?          @map("read_time")
+  status          BlogStatus    @default(DRAFT) @map("status")
+  categoryId      String?       @map("category_id") @db.Uuid
+  category        BlogCategory? @relation(fields: [categoryId], references: [blogCategoryId])
+  tags            BlogTag[]
+  metaTitle       String?       @map("meta_title")
+  metaDescription String?       @map("meta_description")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  publishedAt     DateTime?     @map("published_at")
+
+  @@index([slug])
+  @@index([status])
+  @@index([categoryId])
+  @@index([publishedAt])
+  @@map("blog_posts")
+}
+
+model BlogCategory {
+  blogCategoryId String     @id @default(uuid(7)) @map("blog_category_id") @db.Uuid
+  name           String     @unique @map("name")
+  slug           String     @unique @map("slug")
+  description    String?    @map("description")
+  posts          BlogPost[]
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@map("blog_categories")
+}
+
+model BlogTag {
+  blogTagId String     @id @default(uuid(7)) @map("blog_tag_id") @db.Uuid
+  name      String     @unique @map("name")
+  slug      String     @unique @map("slug")
+  posts     BlogPost[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@map("blog_tags")
+}
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================
+// NEWSLETTER
+// ============================================
+
+model NewsletterSubscriber {
+  newsletterSubscriberId String   @id @default(uuid(7)) @map("newsletter_subscriber_id") @db.Uuid
+  email                  String   @unique @map("email")
+  confirmed              Boolean  @default(false) @map("confirmed")
+  confirmToken           String?  @map("confirm_token")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@map("newsletter_subscribers")
+}
+
+// ============================================
+// CONTACT/INQUIRIES
+// ============================================
+
+model ContactInquiry {
+  contactInquiryId String        @id @default(uuid(7)) @map("contact_inquiry_id") @db.Uuid
+  name             String        @map("name")
+  email            String        @map("email")
+  subject          String        @map("subject")
+  message          String        @db.Text @map("message")
+  status           InquiryStatus @default(NEW) @map("status")
+  adminNotes       String?       @db.Text @map("admin_notes")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("contact_inquiries")
+}
+
+enum InquiryStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// ============================================
+// CIVIC INTELLIGENCE PLATFORM - DATA MODELS
+// ============================================
+
+model RentData {
+  rentDataId   String   @id @default(uuid(7)) @map("rent_data_id") @db.Uuid
+  postcode     String   @map("postcode")
+  propertyType String   @map("property_type")
+  rent         Decimal  @db.Decimal(12, 2) @map("rent")
+  date         DateTime @map("date")
+  source       String   @map("source")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  parentArea Area?  @relation("AreaHierarchy", fields: [parentAreaId], references: [areaId])
-  childAreas Area[] @relation("AreaHierarchy")
-
-  @@index([parentAreaId])
-  @@index([areaType, name])
-  @@map("areas")
+  @@index([postcode])
+  @@index([date])
+  @@index([propertyType])
+  @@map("rent_data")
 }
 
-enum AreaType {
-  BOROUGH
-  POSTCODE
-  CITY
-  NEIGHBOURHOOD
+model PropertyValueData {
+  propertyValueDataId String   @id @default(uuid(7)) @map("property_value_data_id") @db.Uuid
+  postcode            String   @map("postcode")
+  value               Decimal  @db.Decimal(12, 2) @map("value")
+  date                DateTime @map("date")
+  source              String   @map("source")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([postcode])
+  @@index([date])
+  @@map("property_value_data")
+}
+
+model Demography {
+  demographyId String   @id @default(uuid(7)) @map("demography_id") @db.Uuid
+  postcode     String   @map("postcode")
+  ageGroup     String   @map("age_group")
+  percentage   Decimal  @db.Decimal(5, 2) @map("percentage")
+  date         DateTime @map("date")
+  source       String   @map("source")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([postcode])
+  @@index([date])
+  @@map("demography")
+}
+
+model CrimeData {
+  crimeDataId String   @id @default(uuid(7)) @map("crime_data_id") @db.Uuid
+  borough     String   @map("borough")
+  crimeType   String?  @map("crime_type")
+  crimeRate   Decimal  @db.Decimal(10, 2) @map("crime_rate")
+  date        DateTime @map("date")
+  source      String   @map("source")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([borough])
+  @@index([date])
+  @@map("crime_data")
+}
+
+model VotingData {
+  votingDataId String   @id @default(uuid(7)) @map("voting_data_id") @db.Uuid
+  borough      String   @map("borough")
+  year         Int      @map("year")
+  party        String   @map("party")
+  percentage   Decimal  @db.Decimal(5, 2) @map("percentage")
+  source       String   @map("source")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([borough])
+  @@index([year])
+  @@map("voting_data")
+}
+
+model LocalPlan {
+  localPlanId    String   @id @default(uuid(7)) @map("local_plan_id") @db.Uuid
+  borough        String   @map("borough")
+  category       String   @map("category")
+  summary        String   @db.Text @map("summary")
+  indicator      String?  @map("indicator")
+  forecastChange String?  @map("forecast_change")
+  source         String   @map("source")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([borough])
+  @@index([category])
+  @@map("local_plans")
+}
+
+// ============================================
+// CIVIC INTELLIGENCE - CREDITS & SUBSCRIPTIONS
+// ============================================
+
+model UserCredits {
+  userCreditsId    String           @id @default(uuid(7)) @map("user_credits_id") @db.Uuid
+  userId           String           @unique @map("user_id") @db.Uuid
+  user             User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  creditsBalance   Int              @default(15) @map("credits_balance")
+  subscriptionPlan SubscriptionPlan @default(FREE) @map("subscription_plan")
+  aiSummaryUsed    Int              @default(0) @map("ai_summary_used")
+  aiSummaryLimit   Int              @default(0) @map("ai_summary_limit")
+  planExpiresAt    DateTime?        @map("plan_expires_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  downloads          DownloadHistory[]
+  valuations         PropertyValuation[]
+  aiInteractions     AIInteraction[]
+  creditTransactions CreditTransaction[]
+
+  @@map("user_credits")
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  STANDARD
+  PRO
+  PREMIUM
+}
+
+model CreditTransaction {
+  creditTransactionId String          @id @default(uuid(7)) @map("credit_transaction_id") @db.Uuid
+  userCreditsId       String          @map("user_credits_id") @db.Uuid
+  userCredits         UserCredits     @relation(fields: [userCreditsId], references: [userCreditsId], onDelete: Cascade)
+  amount              Int             @map("amount")
+  type                TransactionType @map("type")
+  description         String          @map("description")
+  balanceAfter        Int             @map("balance_after")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  @@index([userCreditsId])
+  @@index([createdAt])
+  @@map("credit_transactions")
+}
+
+enum TransactionType {
+  PURCHASE
+  SUBSCRIPTION
+  DOWNLOAD
+  AI_SUMMARY
+  VALUATION
+  REFUND
+  BONUS
+}
+
+model DownloadHistory {
+  downloadHistoryId String      @id @default(uuid(7)) @map("download_history_id") @db.Uuid
+  userCreditsId     String      @map("user_credits_id") @db.Uuid
+  userCredits       UserCredits @relation(fields: [userCreditsId], references: [userCreditsId], onDelete: Cascade)
+  reportType        ReportType  @map("report_type")
+  format            String      @map("format")
+  postcode          String?     @map("postcode")
+  borough           String?     @map("borough")
+  creditsUsed       Int         @map("credits_used")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@index([userCreditsId])
+  @@index([createdAt])
+  @@map("download_history")
+}
+
+enum ReportType {
+  BASE
+  EXTENDED
+  ADVANCED
+  FULL_SINGLE
+  FULL_DOUBLE
+  VALUATION
+  AI_SUMMARY
+}
+
+// ============================================
+// CIVIC INTELLIGENCE - PROPERTY VALUATION
+// ============================================
+
+model PropertyValuation {
+  propertyValuationId String            @id @default(uuid(7)) @map("property_valuation_id") @db.Uuid
+  userCreditsId       String            @map("user_credits_id") @db.Uuid
+  userCredits         UserCredits       @relation(fields: [userCreditsId], references: [userCreditsId], onDelete: Cascade)
+  postcode            String            @map("postcode")
+  propertyType        String            @map("property_type")
+  bedrooms            Int               @map("bedrooms")
+  bathrooms           Int               @map("bathrooms")
+  floorArea           Int?              @map("floor_area")
+  yearBuilt           Int?              @map("year_built")
+  condition           PropertyCondition @default(AVERAGE) @map("condition")
+  currentValuation    Decimal?          @db.Decimal(12, 2) @map("current_valuation")
+  forecastValuation   Decimal?          @db.Decimal(12, 2) @map("forecast_valuation")
+  forecastDate        DateTime?         @map("forecast_date")
+  aiSummary           String?           @db.Text @map("ai_summary")
+  creditsUsed         Int               @map("credits_used")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  @@index([userCreditsId])
+  @@index([postcode])
+  @@index([createdAt])
+  @@map("property_valuations")
+}
+
+enum PropertyCondition {
+  NEW_BUILD
+  EXCELLENT
+  GOOD
+  AVERAGE
+  NEEDS_WORK
+  RENOVATION_REQUIRED
+}
+
+// ============================================
+// CIVIC INTELLIGENCE - AI INTERACTIONS
+// ============================================
+
+model AIInteraction {
+  aiInteractionId String      @id @default(uuid(7)) @map("ai_interaction_id") @db.Uuid
+  userCreditsId   String      @map("user_credits_id") @db.Uuid
+  userCredits     UserCredits @relation(fields: [userCreditsId], references: [userCreditsId], onDelete: Cascade)
+  query           String      @db.Text @map("query")
+  response        String      @db.Text @map("response")
+  postcode        String?     @map("postcode")
+  borough         String?     @map("borough")
+  tokensUsed      Int?        @map("tokens_used")
+  creditsUsed     Int         @map("credits_used")
+  downloaded      Boolean     @default(false) @map("downloaded")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@index([userCreditsId])
+  @@index([createdAt])
+  @@map("ai_interactions")
 }
