@@ -13,6 +13,7 @@ import blogTagRoutes from './blog-tag.routes';
 import blogPostRoutes from './blog-post.routes';
 import newsletterRoutes from './newsletter.routes';
 import contactInquiryRoutes from './contact-inquiry.routes';
+import agencyRoutes from './agency.routes';
 import { errorHandler, notFoundHandler } from '@middleware/error.middleware';
 
 const router = Router();
@@ -31,6 +32,7 @@ router.use('/blog/tags', blogTagRoutes);
 router.use('/blog/posts', blogPostRoutes);
 router.use('/newsletter', newsletterRoutes);
 router.use('/contact-inquiries', contactInquiryRoutes);
+router.use('/agencies', agencyRoutes);
 router.use(notFoundHandler);
 router.use(errorHandler);
 

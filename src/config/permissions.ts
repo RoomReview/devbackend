@@ -10,4 +10,5 @@ export const permissions = {
   'manage:locations': [UserRole.ADMIN],
   'approve:experiences': [UserRole.ADMIN],
   'manage:blog': [UserRole.ADMIN],
+  'manage:agencies': [UserRole.ADMIN],
 } as const;
