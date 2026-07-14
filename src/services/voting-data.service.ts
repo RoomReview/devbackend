@@ -35,11 +35,10 @@ export const getVotingDataById = async (id: string) => {
 export const createNewVotingData = async (data: CreateVotingDataDto) => {
   return await createVotingData({
     borough: data.borough,
-    wardName: data.wardName,
     year: data.year,
     party: data.party,
-    votes: data.votes,
     percentage: data.percentage,
+    source: data.source,
   });
 };
 
@@ -47,11 +46,10 @@ export const bulkCreateVotingData = async (data: CreateVotingDataDto[]) => {
   return await createManyVotingData(
     data.map(item => ({
       borough: item.borough,
-      wardName: item.wardName,
       year: item.year,
       party: item.party,
-      votes: item.votes,
       percentage: item.percentage,
+      source: item.source,
     }))
   );
 };
@@ -61,11 +59,10 @@ export const updateVotingDataById = async (id: string, data: UpdateVotingDataDto
 
   const updateData: any = {
     borough: data.borough,
-    wardName: data.wardName,
     year: data.year,
     party: data.party,
-    votes: data.votes,
     percentage: data.percentage,
+    source: data.source,
   };
 
   return await updateVotingData(id, updateData);

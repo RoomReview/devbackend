@@ -7,13 +7,12 @@ export const getAllBlogTags = async (
   _req: Request,
   res: Response,
 ): Promise<void> => {
-  const { data, pagination } = await blogTagService.getAllBlogTags();
+  const { data } = await blogTagService.getAllBlogTags();
 
   const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
     data,
-    pagination,
     message: 'Blog tags fetched successfully',
   };
   res.status(200).json(response);
@@ -23,7 +22,7 @@ export const getBlogTagById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await blogTagService.getBlogTagById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -39,7 +38,7 @@ export const getBlogTagBySlug = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { slug } = req.params;
+  const { slug } = req.params as any;
   const data = await blogTagService.getBlogTagBySlug(slug);
 
   const response: ApiResponse<typeof data> = {
@@ -70,7 +69,7 @@ export const updateBlogTag = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await blogTagService.updateBlogTagById(id, req.body as UpdateBlogTagDto);
 
   const response: ApiResponse<typeof data> = {
@@ -86,7 +85,7 @@ export const deleteBlogTag = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await blogTagService.deleteBlogTagById(id);
 
   const response: ApiResponse<null> = {

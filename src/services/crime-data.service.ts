@@ -36,8 +36,9 @@ export const createNewCrimeData = async (data: CreateCrimeDataDto) => {
   return await createCrimeData({
     borough: data.borough,
     crimeType: data.crimeType,
-    crimeCount: data.crimeCount,
-    recordedDate: new Date(data.recordedDate),
+    crimeRate: data.crimeRate,
+    date: new Date(data.date),
+    source: data.source,
   });
 };
 
@@ -46,8 +47,9 @@ export const bulkCreateCrimeData = async (data: CreateCrimeDataDto[]) => {
     data.map(item => ({
       borough: item.borough,
       crimeType: item.crimeType,
-      crimeCount: item.crimeCount,
-      recordedDate: new Date(item.recordedDate),
+      crimeRate: item.crimeRate,
+      date: new Date(item.date),
+      source: item.source,
     }))
   );
 };
@@ -58,8 +60,9 @@ export const updateCrimeDataById = async (id: string, data: UpdateCrimeDataDto) 
   const updateData: any = {
     borough: data.borough,
     crimeType: data.crimeType,
-    crimeCount: data.crimeCount,
-    recordedDate: data.recordedDate ? new Date(data.recordedDate) : undefined,
+    crimeRate: data.crimeRate,
+    date: data.date ? new Date(data.date) : undefined,
+    source: data.source,
   };
 
   return await updateCrimeData(id, updateData);

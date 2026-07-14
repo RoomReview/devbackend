@@ -8,12 +8,9 @@ import {
 export const CreateRentDataDto = object({
   postcode: string().min(1),
   propertyType: string().min(1),
-  bedrooms: number().int().positive(),
-  averageRent: number().positive(),
-  minRent: number().positive(),
-  maxRent: number().positive(),
-  sampleSize: number().int().nonnegative(),
-  recordedDate: string().datetime(),
+  rent: number().positive(),
+  date: string().datetime(),
+  source: string().min(1),
 });
 
 export type CreateRentDataDto = _infer<typeof CreateRentDataDto>;
@@ -21,12 +18,9 @@ export type CreateRentDataDto = _infer<typeof CreateRentDataDto>;
 export const UpdateRentDataDto = object({
   postcode: string().min(1).optional(),
   propertyType: string().min(1).optional(),
-  bedrooms: number().int().positive().optional(),
-  averageRent: number().positive().optional(),
-  minRent: number().positive().optional(),
-  maxRent: number().positive().optional(),
-  sampleSize: number().int().nonnegative().optional(),
-  recordedDate: string().datetime().optional(),
+  rent: number().positive().optional(),
+  date: string().datetime().optional(),
+  source: string().min(1).optional(),
 });
 
 export type UpdateRentDataDto = _infer<typeof UpdateRentDataDto>;

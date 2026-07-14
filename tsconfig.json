@@ -8,7 +8,6 @@
     // "explainFiles": true,
 
     /* Paths & Outputs */
-    "rootDir": "./src",
     "outDir": "./dist",
     "sourceMap": true,
 
@@ -41,7 +40,7 @@
       "@dto/*": ["src/dto/*"]
     },
 
-    // "allowImportingTsExtensions": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["node"],
     "diagnostics": true

@@ -18,7 +18,7 @@ export const getUserCredits = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { userId } = req.params;
+  const { userId } = req.params as any;
   validateOwnerOrAdmin(req, userId);
 
   const data = await creditsService.getUserCreditsByUserId(userId);
@@ -36,7 +36,7 @@ export const updateUserCredits = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { userId } = req.params;
+  const { userId } = req.params as any;
   const data = await creditsService.updateUserCreditsByUserId(userId, req.body as UpdateUserCreditsDto);
 
   const response: ApiResponse<typeof data> = {
@@ -52,7 +52,7 @@ export const adjustUserCredits = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { userId } = req.params;
+  const { userId } = req.params as any;
   const body = req.body as AdjustUserCreditsDto;
   const data = await creditsService.adjustUserCredits(userId, body.amount, body.type, body.description);
 

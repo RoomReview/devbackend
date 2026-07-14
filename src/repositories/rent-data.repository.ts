@@ -42,12 +42,9 @@ export const findRentDataById = async (rentDataId: string, select?: RentDataSele
       rentDataId: true,
       postcode: true,
       propertyType: true,
-      bedrooms: true,
-      averageRent: true,
-      minRent: true,
-      maxRent: true,
-      sampleSize: true,
-      recordedDate: true,
+      rent: true,
+      date: true,
+      source: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -61,7 +58,6 @@ export const findRentDataById = async (rentDataId: string, select?: RentDataSele
 export interface FindRentDataFilter {
   postcode?: string;
   propertyType?: string;
-  bedrooms?: number;
 }
 
 export const findAllRentData = async (
@@ -73,20 +69,19 @@ export const findAllRentData = async (
   const where: any = {};
   if (filter?.postcode) where.postcode = filter.postcode;
   if (filter?.propertyType) where.propertyType = filter.propertyType;
-  if (filter?.bedrooms !== undefined) where.bedrooms = filter.bedrooms;
 
   return await prisma.rentData.findMany({
     where,
     take: limit,
     skip: offset,
-    orderBy: { recordedDate: 'desc' },
+    orderBy: { date: 'desc' },
     select: select || {
       rentDataId: true,
       postcode: true,
       propertyType: true,
-      bedrooms: true,
-      averageRent: true,
-      recordedDate: true,
+      rent: true,
+      date: true,
+      source: true,
     },
   }).catch(err => {
     logContext.function = 'findAllRentData';
@@ -99,7 +94,6 @@ export const countRentData = async (filter?: FindRentDataFilter) => {
   const where: any = {};
   if (filter?.postcode) where.postcode = filter.postcode;
   if (filter?.propertyType) where.propertyType = filter.propertyType;
-  if (filter?.bedrooms !== undefined) where.bedrooms = filter.bedrooms;
 
   return await prisma.rentData.count({ where }).catch(err => {
     logContext.function = 'countRentData';

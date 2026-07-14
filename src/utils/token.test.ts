@@ -23,7 +23,6 @@ describe('token.service', () => {
     it('should set expiration time to 15 minutes from now', () => {
       const before = Date.now();
       const result = generateVerificationCode();
-      const after = Date.now();
       const expectedExpiration = 15 * 60 * 1000;
       const actualExpiration = result.expiresAt.getTime() - before;
       ok(

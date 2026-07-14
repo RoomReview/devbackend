@@ -29,7 +29,7 @@ export const getPropertyValueDataById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await valService.getPropertyValueDataById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -75,7 +75,7 @@ export const updatePropertyValueData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await valService.updatePropertyValueDataById(id, req.body as UpdatePropertyValueDataDto);
 
   const response: ApiResponse<typeof data> = {
@@ -91,7 +91,7 @@ export const deletePropertyValueData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await valService.deletePropertyValueDataById(id);
 
   const response: ApiResponse<null> = {

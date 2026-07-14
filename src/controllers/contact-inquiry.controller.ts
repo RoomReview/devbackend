@@ -23,7 +23,7 @@ export const getInquiryById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await contactInquiryService.getInquiryById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -59,7 +59,7 @@ export const updateInquiryStatus = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await contactInquiryService.updateInquiryStatus(id, req.body as UpdateContactInquiryStatusDto);
 
   const response: ApiResponse<typeof data> = {
@@ -75,7 +75,7 @@ export const deleteInquiry = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await contactInquiryService.deleteInquiryById(id);
 
   const response: ApiResponse<null> = {

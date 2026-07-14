@@ -38,7 +38,7 @@ export const getPropertyById = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await propertyService.getPropertyById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -70,7 +70,7 @@ export const updateProperty = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   const data = await propertyService.updatePropertyById(id, req.body as UpdatePropertyDto, userId, role);
@@ -88,7 +88,7 @@ export const deleteProperty = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   await propertyService.deletePropertyById(id, userId, role);

@@ -27,12 +27,11 @@ export const findLocalPlanById = async (localPlanId: string, select?: LocalPlanS
     select: select || {
       localPlanId: true,
       borough: true,
-      title: true,
-      documentUrl: true,
-      adoptionDate: true,
-      status: true,
       category: true,
       summary: true,
+      indicator: true,
+      forecastChange: true,
+      source: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -46,7 +45,6 @@ export const findLocalPlanById = async (localPlanId: string, select?: LocalPlanS
 export interface FindLocalPlansFilter {
   borough?: string;
   category?: string;
-  status?: string;
 }
 
 export const findAllLocalPlans = async (
@@ -58,21 +56,20 @@ export const findAllLocalPlans = async (
   const where: any = {};
   if (filter?.borough) where.borough = filter.borough;
   if (filter?.category) where.category = filter.category;
-  if (filter?.status) where.status = filter.status;
 
   return await prisma.localPlan.findMany({
     where,
     take: limit,
     skip: offset,
-    orderBy: { adoptionDate: 'desc' },
+    orderBy: { createdAt: 'desc' },
     select: select || {
       localPlanId: true,
       borough: true,
-      title: true,
-      documentUrl: true,
-      adoptionDate: true,
-      status: true,
       category: true,
+      summary: true,
+      indicator: true,
+      forecastChange: true,
+      source: true,
     },
   }).catch(err => {
     logContext.function = 'findAllLocalPlans';
@@ -85,7 +82,6 @@ export const countLocalPlans = async (filter?: FindLocalPlansFilter) => {
   const where: any = {};
   if (filter?.borough) where.borough = filter.borough;
   if (filter?.category) where.category = filter.category;
-  if (filter?.status) where.status = filter.status;
 
   return await prisma.localPlan.count({ where }).catch(err => {
     logContext.function = 'countLocalPlans';

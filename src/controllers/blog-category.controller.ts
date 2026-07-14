@@ -7,13 +7,12 @@ export const getAllBlogCategories = async (
   _req: Request,
   res: Response,
 ): Promise<void> => {
-  const { data, pagination } = await blogCategoryService.getAllBlogCategories();
+  const { data } = await blogCategoryService.getAllBlogCategories();
 
   const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
     data,
-    pagination,
     message: 'Blog categories fetched successfully',
   };
   res.status(200).json(response);
@@ -23,7 +22,7 @@ export const getBlogCategoryById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await blogCategoryService.getBlogCategoryById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -39,7 +38,7 @@ export const getBlogCategoryBySlug = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { slug } = req.params;
+  const { slug } = req.params as any;
   const data = await blogCategoryService.getBlogCategoryBySlug(slug);
 
   const response: ApiResponse<typeof data> = {
@@ -70,7 +69,7 @@ export const updateBlogCategory = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await blogCategoryService.updateBlogCategoryById(id, req.body as UpdateBlogCategoryDto);
 
   const response: ApiResponse<typeof data> = {
@@ -86,7 +85,7 @@ export const deleteBlogCategory = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await blogCategoryService.deleteBlogCategoryById(id);
 
   const response: ApiResponse<null> = {

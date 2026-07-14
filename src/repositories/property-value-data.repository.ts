@@ -41,10 +41,9 @@ export const findPropertyValueDataById = async (propertyValueDataId: string, sel
     select: select || {
       propertyValueDataId: true,
       postcode: true,
-      averageValue: true,
-      growthRate: true,
-      salesVolume: true,
-      recordedDate: true,
+      value: true,
+      date: true,
+      source: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -72,14 +71,13 @@ export const findAllPropertyValueData = async (
     where,
     take: limit,
     skip: offset,
-    orderBy: { recordedDate: 'desc' },
+    orderBy: { date: 'desc' },
     select: select || {
       propertyValueDataId: true,
       postcode: true,
-      averageValue: true,
-      growthRate: true,
-      salesVolume: true,
-      recordedDate: true,
+      value: true,
+      date: true,
+      source: true,
     },
   }).catch(err => {
     logContext.function = 'findAllPropertyValueData';

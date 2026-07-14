@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import type { ZodType } from 'zod';
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Omit<Request, 'user'> {
   user?: {
     userId: string;
     email: string;

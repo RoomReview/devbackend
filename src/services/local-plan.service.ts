@@ -34,12 +34,11 @@ export const getLocalPlanById = async (id: string) => {
 export const createNewLocalPlan = async (data: CreateLocalPlanDto) => {
   return await createLocalPlan({
     borough: data.borough,
-    title: data.title,
-    documentUrl: data.documentUrl,
-    adoptionDate: new Date(data.adoptionDate),
-    status: data.status,
     category: data.category,
     summary: data.summary,
+    indicator: data.indicator,
+    forecastChange: data.forecastChange,
+    source: data.source,
   });
 };
 
@@ -48,12 +47,11 @@ export const updateLocalPlanById = async (id: string, data: UpdateLocalPlanDto) 
 
   const updateData: any = {
     borough: data.borough,
-    title: data.title,
-    documentUrl: data.documentUrl,
-    adoptionDate: data.adoptionDate ? new Date(data.adoptionDate) : undefined,
-    status: data.status,
     category: data.category,
     summary: data.summary,
+    indicator: data.indicator,
+    forecastChange: data.forecastChange,
+    source: data.source,
   };
 
   return await updateLocalPlan(id, updateData);

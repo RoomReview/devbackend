@@ -26,7 +26,7 @@ export const getAgencyById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await agencyService.getAgencyById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -57,7 +57,7 @@ export const updateAgency = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   const data = await agencyService.updateAgencyById(id, req.body as UpdateAgencyDto, userId, role);
@@ -75,7 +75,7 @@ export const verifyAgency = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await agencyService.verifyAgencyById(id, req.body as VerifyAgencyDto);
 
   const response: ApiResponse<typeof data> = {
@@ -91,7 +91,7 @@ export const deleteAgency = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await agencyService.deleteAgencyById(id);
 
   const response: ApiResponse<null> = {
@@ -106,7 +106,7 @@ export const getAgencyAgents = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await agencyService.getAgencyAgents(id);
 
   const response: ApiResponse<typeof data> = {
@@ -122,7 +122,7 @@ export const verifyAgentInAgency = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id, agentId } = req.params;
+  const { id, agentId } = req.params as any;
   const { isVerified } = req.body;
   const data = await agencyService.verifyAgentInAgency(id, agentId, Boolean(isVerified));
 

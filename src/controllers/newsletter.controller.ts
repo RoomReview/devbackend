@@ -37,7 +37,7 @@ export const unsubscribe = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { email } = req.params;
+  const { email } = req.params as any;
   await newsletterService.unsubscribeFromNewsletter(email);
 
   const response: ApiResponse<null> = {

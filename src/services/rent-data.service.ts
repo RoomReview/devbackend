@@ -36,12 +36,9 @@ export const createNewRentData = async (data: CreateRentDataDto) => {
   return await createRentData({
     postcode: data.postcode,
     propertyType: data.propertyType,
-    bedrooms: data.bedrooms,
-    averageRent: data.averageRent,
-    minRent: data.minRent,
-    maxRent: data.maxRent,
-    sampleSize: data.sampleSize,
-    recordedDate: new Date(data.recordedDate),
+    rent: data.rent,
+    date: new Date(data.date),
+    source: data.source,
   });
 };
 
@@ -50,12 +47,9 @@ export const bulkCreateRentData = async (data: CreateRentDataDto[]) => {
     data.map(item => ({
       postcode: item.postcode,
       propertyType: item.propertyType,
-      bedrooms: item.bedrooms,
-      averageRent: item.averageRent,
-      minRent: item.minRent,
-      maxRent: item.maxRent,
-      sampleSize: item.sampleSize,
-      recordedDate: new Date(item.recordedDate),
+      rent: item.rent,
+      date: new Date(item.date),
+      source: item.source,
     }))
   );
 };
@@ -66,12 +60,9 @@ export const updateRentDataById = async (id: string, data: UpdateRentDataDto) =>
   const updateData: any = {
     postcode: data.postcode,
     propertyType: data.propertyType,
-    bedrooms: data.bedrooms,
-    averageRent: data.averageRent,
-    minRent: data.minRent,
-    maxRent: data.maxRent,
-    sampleSize: data.sampleSize,
-    recordedDate: data.recordedDate ? new Date(data.recordedDate) : undefined,
+    rent: data.rent,
+    date: data.date ? new Date(data.date) : undefined,
+    source: data.source,
   };
 
   return await updateRentData(id, updateData);

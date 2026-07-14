@@ -10,11 +10,13 @@ import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import { TransactionType } from '@/generated/prisma/enums';
 
 export const createCreditTransaction = async (data: CreateCreditTransactionDto) => {
-  const isDebit = [
-    TransactionType.DOWNLOAD,
-    TransactionType.AI_SUMMARY,
-    TransactionType.VALUATION,
-  ].includes(data.type);
+  const isDebit = (
+    [
+      TransactionType.DOWNLOAD,
+      TransactionType.AI_SUMMARY,
+      TransactionType.VALUATION,
+    ] as TransactionType[]
+  ).includes(data.type);
 
   if (isDebit) {
     return await deductCredits(data.userId, data.amount, data.type, data.description);

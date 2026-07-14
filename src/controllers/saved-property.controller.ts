@@ -46,7 +46,7 @@ export const unsaveProperty = async (
   res: Response,
 ): Promise<void> => {
   const userId = req.user!.userId;
-  const { propertyId } = req.params;
+  const { propertyId } = req.params as any;
 
   await savedPropertyService.unsavePropertyForUser(userId, propertyId);
 

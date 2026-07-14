@@ -7,20 +7,18 @@ import {
 
 export const CreatePropertyValueDataDto = object({
   postcode: string().min(1),
-  averageValue: number().positive(),
-  growthRate: number(),
-  salesVolume: number().int().nonnegative(),
-  recordedDate: string().datetime(),
+  value: number().positive(),
+  date: string().datetime(),
+  source: string().min(1),
 });
 
 export type CreatePropertyValueDataDto = _infer<typeof CreatePropertyValueDataDto>;
 
 export const UpdatePropertyValueDataDto = object({
   postcode: string().min(1).optional(),
-  averageValue: number().positive().optional(),
-  growthRate: number().optional(),
-  salesVolume: number().int().nonnegative().optional(),
-  recordedDate: string().datetime().optional(),
+  value: number().positive().optional(),
+  date: string().datetime().optional(),
+  source: string().min(1).optional(),
 });
 
 export type UpdatePropertyValueDataDto = _infer<typeof UpdatePropertyValueDataDto>;
