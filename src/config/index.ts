@@ -20,6 +20,7 @@ export const config = {
   jwtRefreshTokenAudience:
     process.env.JWT_REFRESH_TOKEN_AUDIENCE ?? 'roomreview-auth',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+  requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS) || 30_000,
   saltKeyLength: 16,
   passwordHashLength: 64,
   // Email - Provider (Sendgrid)

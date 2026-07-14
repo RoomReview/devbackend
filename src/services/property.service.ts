@@ -1,62 +1,155 @@
-// Property service - Business logic for properties
+import {
+  createProperty,
+  findPropertyById,
+  findAllProperties,
+  countProperties,
+  updateProperty,
+  deleteProperty,
+  incrementPropertyViewCount,
+  FindPropertiesFilter,
+} from '@/repositories/property.repository';
+import { EntityNotFoundError, ForbiddenError, ValidationError } from '@/utils/custom-error';
+import type { CreatePropertyDto, UpdatePropertyDto } from '@/dto/property.dto';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
+import { PropertyStatus, UserRole } from '@/generated/prisma/enums';
+import { findPostcodeById } from '@/repositories/postcode.repository';
 
-export interface Property {
-  id: string;
-  address: string;
-  postcode: string;
-  city: string;
-  propertyType: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export const findAllProperties = async (): Promise<Property[]> => {
-  // TODO: Implement with Prisma
-  return [];
+export const getAllProperties = async (page: number, limit: number, filter?: FindPropertiesFilter) => {
+  const { offset } = paginate(page, limit);
+  const [properties, total] = await Promise.all([
+    findAllProperties(limit, offset, filter),
+    countProperties(filter),
+  ]);
+  return buildPaginatedResult(properties, total, page, limit);
 };
 
-export const findPropertyById = async (
+export const getPropertyById = async (id: string) => {
+  const property = await findPropertyById(id);
+  if (!property) {
+    throw new EntityNotFoundError({
+      message: `Property with ID ${id} not found`,
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  // Increment view count asynchronously
+  incrementPropertyViewCount(id);
+
+  return property;
+};
+
+export const createNewProperty = async (data: CreatePropertyDto, landlordId: string) => {
+  const postcode = await findPostcodeById(data.postcodeId);
+  if (!postcode) {
+    throw new ValidationError({
+      message: `Postcode with ID ${data.postcodeId} does not exist`,
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  return await createProperty({
+    title: data.title,
+    description: data.description,
+    type: data.type,
+    listingType: data.listingType,
+    price: data.price,
+    priceFrequency: data.priceFrequency,
+    bedrooms: data.bedrooms,
+    bathrooms: data.bathrooms,
+    size: data.size,
+    furnished: data.furnished,
+    address: data.address,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    features: data.features,
+    availableFrom: data.availableFrom ? new Date(data.availableFrom) : undefined,
+    minTenancy: data.minTenancy,
+    deposit: data.deposit,
+    bills: data.bills,
+    epcRating: data.epcRating,
+    floorPlan: data.floorPlan,
+    verified: false,
+    featured: false,
+    status: PropertyStatus.ACTIVE,
+    landlord: { connect: { userId: landlordId } },
+    postcode: { connect: { postcodeId: data.postcodeId } },
+  });
+};
+
+export const updatePropertyById = async (
   id: string,
-): Promise<Property | null> => {
-  // TODO: Implement with Prisma
-  console.log(`Finding property: ${id}`);
-  return null;
+  data: UpdatePropertyDto,
+  userId: string,
+  userRole: string,
+) => {
+  const existing = await findPropertyById(id);
+  if (!existing) {
+    throw new EntityNotFoundError({
+      message: `Property with ID ${id} not found`,
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  // Authorization check: Only landlord or ADMIN can update
+  if (existing.landlordId !== userId && userRole !== UserRole.ADMIN) {
+    throw new ForbiddenError({
+      message: 'You are not authorized to update this property',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  if (data.postcodeId) {
+    const postcode = await findPostcodeById(data.postcodeId);
+    if (!postcode) {
+      throw new ValidationError({
+        message: `Postcode with ID ${data.postcodeId} does not exist`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+  }
+
+  return await updateProperty(id, {
+    title: data.title,
+    description: data.description,
+    type: data.type,
+    listingType: data.listingType,
+    price: data.price,
+    priceFrequency: data.priceFrequency,
+    bedrooms: data.bedrooms,
+    bathrooms: data.bathrooms,
+    size: data.size,
+    furnished: data.furnished,
+    address: data.address,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    features: data.features,
+    availableFrom: data.availableFrom ? new Date(data.availableFrom) : undefined,
+    minTenancy: data.minTenancy,
+    deposit: data.deposit,
+    bills: data.bills,
+    epcRating: data.epcRating,
+    floorPlan: data.floorPlan,
+    status: data.status,
+    ...(data.postcodeId ? { postcode: { connect: { postcodeId: data.postcodeId } } } : {}),
+  });
 };
 
-export const findPropertiesByPostcode = async (
-  postcode: string,
-): Promise<Property[]> => {
-  // TODO: Implement with Prisma
-  console.log(`Finding properties by postcode: ${postcode}`);
-  return [];
-};
+export const deletePropertyById = async (id: string, userId: string, userRole: string) => {
+  const existing = await findPropertyById(id);
+  if (!existing) {
+    throw new EntityNotFoundError({
+      message: `Property with ID ${id} not found`,
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
 
-export const createProperty = async (
-  data: Partial<Property>,
-): Promise<Property> => {
-  // TODO: Implement with Prisma
-  return {
-    id: 'temp-id',
-    address: data.address ?? '',
-    postcode: data.postcode ?? '',
-    city: data.city ?? '',
-    propertyType: data.propertyType ?? '',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-};
+  // Authorization check: Only landlord or ADMIN can delete
+  if (existing.landlordId !== userId && userRole !== UserRole.ADMIN) {
+    throw new ForbiddenError({
+      message: 'You are not authorized to delete this property',
+      code: 'VALIDATION_ERROR',
+    });
+  }
 
-export const updateProperty = async (
-  id: string,
-  data: Partial<Property>,
-): Promise<Property | null> => {
-  // TODO: Implement with Prisma
-  console.log(`Updating property: ${id}`, data);
-  return null;
-};
-
-export const deleteProperty = async (id: string): Promise<boolean> => {
-  // TODO: Implement with Prisma
-  console.log(`Deleting property: ${id}`);
-  return true;
+  return await deleteProperty(id);
 };

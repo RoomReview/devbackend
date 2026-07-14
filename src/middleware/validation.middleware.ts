@@ -13,13 +13,21 @@ export const validateRequest = <
   return (req: Request, _res: Response, next: NextFunction): void => {
     try {
       if (schemas.body) {
-        schemas.body.parse(req.body);
+        req.body = schemas.body.parse(req.body);
       }
       if (schemas.params) {
-        schemas.params.parse(req.params) as any;
+        const parsedParams = schemas.params.parse(req.params) as any;
+        for (const key in req.params) {
+          delete req.params[key];
+        }
+        Object.assign(req.params, parsedParams);
       }
       if (schemas.query) {
-        schemas.query.parse(req.query) as any;
+        const parsedQuery = schemas.query.parse(req.query) as any;
+        for (const key in req.query) {
+          delete req.query[key];
+        }
+        Object.assign(req.query, parsedQuery);
       }
       return next();
     } catch (error) {

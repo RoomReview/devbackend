@@ -109,6 +109,10 @@ const router = Router();
  *               $ref: '#/components/schemas/ApiResponse'
  *       400:
  *         description: Bad request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post(
   '/register',
@@ -131,8 +135,16 @@ router.post(
  *     responses:
  *       200:
  *         description: User logged in successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  *       401:
  *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post(
   '/login',
@@ -159,6 +171,10 @@ router.post(
  *     responses:
  *       200:
  *         description: User logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/logout',
@@ -185,6 +201,10 @@ router.post(
  *     responses:
  *       201:
  *         description: Verification code sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/email/verify/reset',
@@ -214,6 +234,10 @@ router.post(
  *     responses:
  *       200:
  *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get(
   '/email/verify',
@@ -242,6 +266,10 @@ router.get(
  *     responses:
  *       200:
  *         description: Access token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/refresh',
@@ -270,6 +298,10 @@ router.post(
  *     responses:
  *       200:
  *         description: If the email exists, a password reset code has been sent.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/forgot-password',
@@ -301,6 +333,10 @@ router.post(
  *     responses:
  *       200:
  *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/reset-password',
@@ -319,6 +355,10 @@ router.post(
  *     responses:
  *       200:
  *         description: User fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get(
   '/me',

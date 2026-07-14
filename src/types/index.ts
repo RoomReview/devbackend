@@ -31,6 +31,12 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   statusCode: number;
   data?: T;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
   message?: string;
   error?: string;
   status?: string;

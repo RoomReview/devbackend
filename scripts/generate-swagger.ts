@@ -22,6 +22,43 @@ const options = {
         description: 'Development server',
       },
     ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+      schemas: {
+        ApiResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            statusCode: { type: 'integer', example: 200 },
+            message: { type: 'string', example: 'Operation successful' },
+            data: {
+              oneOf: [
+                { type: 'object' },
+                { type: 'array', items: {} },
+                { type: 'null' },
+              ],
+            },
+          },
+        },
+        ErrorResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            statusCode: { type: 'integer', example: 400 },
+            message: { type: 'string', example: 'An error occurred' },
+            code: { type: 'string', example: 'VALIDATION_ERROR' },
+            data: { type: 'object', nullable: true },
+          },
+        },
+      },
+    },
+    security: [{ bearerAuth: [] }],
   },
   // Point to where your route files are located
   apis: ['./src/routes/*.ts', './src/controllers/*.ts'],

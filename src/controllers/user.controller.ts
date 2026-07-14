@@ -1,90 +1,128 @@
-import {
-  findAllUsers,
-  changePassword as changePasswordService,
-} from '@/services/user.service';
+import * as userService from '@/services/user.service';
 import { ApiResponse } from '@/types';
 import type { Request, Response } from 'express';
+import type { UpdateUserProfileDto } from '@/dto/update-user.dto';
+import { UserSelect } from '@/generated/prisma/models';
+import { EntityNotFoundError } from '@/utils/custom-error';
+
+const defaultSelectFields: UserSelect = {
+  userId: true,
+  firstName: true,
+  lastName: true,
+  isEmailVerified: true,
+  isActive: true,
+  email: true,
+  role: true,
+  phone: true,
+  avatar: true,
+  bio: true,
+};
 
 export const getAllUsers = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    const { users } = await findAllUsers({
-      page: Number(page),
-      limit: Number(limit),
-    });
-    const resultant: ApiResponse<{ users: typeof users }> = {
-      message: 'Get all users',
-      data: { users },
-      statusCode: 200,
-      success: true,
-    };
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  
+  const { data, pagination } = await userService.findAllUsers({
+    page,
+    limit,
+  });
 
-    res.status(resultant.statusCode).json(resultant);
-  } catch {
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 200,
+    data,
+    pagination,
+    message: 'Users fetched successfully',
+  };
+  res.status(200).json(response);
 };
 
 export const getUserById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    const { id } = req.params;
-    res.status(200).json({ message: `Get user by id: ${id}` });
-  } catch {
-    res.status(500).json({ error: 'Internal server error' });
+  const { id } = req.params;
+  const user = await userService.findUserById(id, defaultSelectFields);
+  if (!user) {
+    throw new EntityNotFoundError({
+      message: 'User not found',
+      code: 'ENTITY_NOT_FOUND',
+    });
   }
+
+  const response: ApiResponse<typeof user> = {
+    success: true,
+    statusCode: 200,
+    data: user,
+    message: 'User fetched successfully',
+  };
+  res.status(200).json(response);
 };
 
 export const createUser = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    res.status(201).json({ message: 'Create user', data: req.body });
-  } catch {
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const user = await userService.createUser(req.body);
+
+  const response: ApiResponse<typeof user> = {
+    success: true,
+    statusCode: 201,
+    data: user,
+    message: 'User created successfully',
+  };
+  res.status(201).json(response);
 };
 
 export const updateUser = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    const { id } = req.params;
-    res.status(200).json({ message: `Update user: ${id}`, data: req.body });
-  } catch {
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const { id } = req.params;
+  const updatedUser = await userService.updateUser(id, req.body as UpdateUserProfileDto);
+
+  const response: ApiResponse<typeof updatedUser> = {
+    success: true,
+    statusCode: 200,
+    data: updatedUser,
+    message: 'User updated successfully',
+  };
+  res.status(200).json(response);
 };
 
 export const deleteUser = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    const { id } = req.params;
-    res.status(200).json({ message: `Delete user: ${id}` });
-  } catch {
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const { id } = req.params;
+  await userService.deleteUser(id);
+
+  const response: ApiResponse<null> = {
+    success: true,
+    statusCode: 200,
+    message: 'User deleted successfully',
+  };
+  res.status(200).json(response);
 };
 
 export const activateUser = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    const { id } = req.params;
-    res.status(200).json({ message: `Activate user: ${id}` });
-  } catch {
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const { id } = req.params;
+  // Activate user by setting isActive = true
+  const updatedUser = await userService.updateUser(id, { isActive: true } as any);
+
+  const response: ApiResponse<typeof updatedUser> = {
+    success: true,
+    statusCode: 200,
+    data: updatedUser,
+    message: 'User activated successfully',
+  };
+  res.status(200).json(response);
 };
 
 export const changePassword = async (
@@ -92,12 +130,13 @@ export const changePassword = async (
   res: Response,
 ): Promise<void> => {
   const { userId } = req.params;
-  await changePasswordService(userId as string, req.body);
-  const resultant: ApiResponse<null> = {
-    message: 'Password changed successfully',
-    data: null,
-    statusCode: 200,
+  await userService.changePassword(userId as string, req.body);
+
+  const response: ApiResponse<null> = {
     success: true,
+    statusCode: 200,
+    data: null,
+    message: 'Password changed successfully',
   };
-  res.status(200).json(resultant);
+  res.status(200).json(response);
 };

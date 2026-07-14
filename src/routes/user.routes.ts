@@ -7,6 +7,8 @@ import {
 } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { ChangePasswordDto } from '@/dto/user.dto';
+import { UpdateUserProfileDto } from '@/dto/update-user.dto';
+import { PaginationQueryDto } from '@/dto/pagination.dto';
 
 /**
  * @swagger
@@ -61,11 +63,16 @@ const router = Router();
  *     responses:
  *       200:
  *         description: List of users fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get(
   '/',
   authenticate,
   authorize('view:users:all'),
+  validateRequest({ query: PaginationQueryDto }),
   userController.getAllUsers,
 );
 
@@ -85,6 +92,10 @@ router.get(
  *     responses:
  *       200:
  *         description: User found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.get('/:id', userController.getUserById);
 
@@ -97,6 +108,10 @@ router.get('/:id', userController.getUserById);
  *     responses:
  *       201:
  *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post('/', userController.createUser);
 
@@ -116,8 +131,18 @@ router.post('/', userController.createUser);
  *     responses:
  *       200:
  *         description: User updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
-router.put('/:id', userController.updateUser);
+router.put(
+  '/:id',
+  authenticate,
+  requireMatchingUser(['params.id']),
+  validateRequest({ body: UpdateUserProfileDto }),
+  userController.updateUser,
+);
 
 /**
  * @swagger
@@ -135,8 +160,17 @@ router.put('/:id', userController.updateUser);
  *     responses:
  *       200:
  *         description: User deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
-router.delete('/:id', userController.deleteUser);
+router.delete(
+  '/:id',
+  authenticate,
+  requireMatchingUser(['params.id']),
+  userController.deleteUser,
+);
 
 /**
  * @swagger
@@ -162,6 +196,10 @@ router.delete('/:id', userController.deleteUser);
  *     responses:
  *       200:
  *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
  */
 router.post(
   '/:userId/change-password',

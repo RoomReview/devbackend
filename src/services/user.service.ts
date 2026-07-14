@@ -2,9 +2,10 @@ import { UserCreateInput, UserSelect } from '@/generated/prisma/models';
 import * as userDal from '@/repositories/users.repository';
 import { PaginateArgs } from '@/types';
 import { ChangePasswordDto } from '@/dto/user.dto';
+import { UpdateUserProfileDto } from '@/dto/update-user.dto';
 import { EntityNotFoundError, UnauthorizedError } from '@/utils/custom-error';
 import { comparePassword, hashPassword } from '@/utils/password';
-import { paginate } from '@/utils/helpers';
+import { paginate, buildPaginatedResult } from '@/utils/helpers';
 import prisma from '@config/database';
 import { UserRole } from '@/generated/prisma/enums';
 import {
@@ -34,8 +35,11 @@ const defaultSelectFields: UserSelect = {
 export const findAllUsers = async (data: PaginateArgs) => {
   const { page, limit } = data;
   const { offset } = paginate(page, limit);
-  const users = await userDal.findAllUsers(limit, offset);
-  return { users };
+  const [users, total] = await Promise.all([
+    userDal.findAllUsers(limit, offset),
+    userDal.countUsers(),
+  ]);
+  return buildPaginatedResult(users, total, page, limit);
 };
 
 export const findUserById = async (
@@ -167,15 +171,37 @@ export const registerUser = async (
 
 export const updateUser = async (
   id: string,
-  data: Partial<User>,
-): Promise<User | null> => {
-  // TODO: Implement with Prisma
-  console.log(`Updating user: ${id}`, data);
-  return null;
+  data: UpdateUserProfileDto,
+): Promise<any> => {
+  const existing = await userDal.findUserById(id, defaultSelectFields);
+  if (!existing) {
+    throw new EntityNotFoundError({
+      message: 'User not found',
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  const updated = await userDal.updateUser(id, {
+    firstName: data.firstName,
+    lastName: data.lastName,
+    phone: data.phone,
+    avatar: data.avatar,
+    bio: data.bio,
+  });
+
+  const { passwordHash, verifyCodeHash, ...userWithoutSensitive } = updated;
+  return userWithoutSensitive;
 };
 
 export const deleteUser = async (id: string): Promise<boolean> => {
-  // TODO: Implement with Prisma
-  console.log(`Deleting user: ${id}`);
+  const existing = await userDal.findUserById(id, { userId: true });
+  if (!existing) {
+    throw new EntityNotFoundError({
+      message: 'User not found',
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  await userDal.deleteUser(id);
   return true;
 };
