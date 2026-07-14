@@ -3,3 +3,9 @@ dist
 .env
 /src/generated/prisma
 .eslintcache
+
+# Lockfiles
+package-lock.json
+yarn.lock
+bun.lock
+bun.lockb
