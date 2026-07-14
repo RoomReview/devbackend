@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build:dev": "tsc && tsdown",
-    "build:prod": "tsc && tsdown",
+    "build:prod": "node scripts/migrate.mjs generate && tsc && tsdown",
     "start": "node dist/index.mjs",
     "start:cjs": "node dist/index.cjs",
     "typecheck": "tsc",
