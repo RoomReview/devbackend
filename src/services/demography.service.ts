@@ -35,10 +35,10 @@ export const getDemographyById = async (id: string) => {
 export const createNewDemography = async (data: CreateDemographyDto) => {
   return await createDemography({
     postcode: data.postcode,
-    population: data.population,
-    medianAge: data.medianAge,
-    socialGrade: data.socialGrade,
-    recordedDate: new Date(data.recordedDate),
+    ageGroup: data.ageGroup,
+    percentage: data.percentage,
+    date: new Date(data.date),
+    source: data.source,
   });
 };
 
@@ -46,10 +46,10 @@ export const bulkCreateDemography = async (data: CreateDemographyDto[]) => {
   return await createManyDemography(
     data.map(item => ({
       postcode: item.postcode,
-      population: item.population,
-      medianAge: item.medianAge,
-      socialGrade: item.socialGrade,
-      recordedDate: new Date(item.recordedDate),
+      ageGroup: item.ageGroup,
+      percentage: item.percentage,
+      date: new Date(item.date),
+      source: item.source,
     }))
   );
 };
@@ -59,10 +59,10 @@ export const updateDemographyById = async (id: string, data: UpdateDemographyDto
 
   const updateData: any = {
     postcode: data.postcode,
-    population: data.population,
-    medianAge: data.medianAge,
-    socialGrade: data.socialGrade,
-    recordedDate: data.recordedDate ? new Date(data.recordedDate) : undefined,
+    ageGroup: data.ageGroup,
+    percentage: data.percentage,
+    date: data.date ? new Date(data.date) : undefined,
+    source: data.source,
   };
 
   return await updateDemography(id, updateData);

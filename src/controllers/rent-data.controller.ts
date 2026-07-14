@@ -31,7 +31,7 @@ export const getRentDataById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await rentService.getRentDataById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -77,7 +77,7 @@ export const updateRentData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await rentService.updateRentDataById(id, req.body as UpdateRentDataDto);
 
   const response: ApiResponse<typeof data> = {
@@ -93,7 +93,7 @@ export const deleteRentData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await rentService.deleteRentDataById(id);
 
   const response: ApiResponse<null> = {

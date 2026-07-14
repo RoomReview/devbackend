@@ -1,5 +1,4 @@
 import {
-  createAIInteraction,
   findAIInteractionById,
   findAllAIInteractionsByUserCreditsId,
   countAIInteractionsByUserCreditsId,

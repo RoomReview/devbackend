@@ -41,11 +41,10 @@ export const findVotingDataById = async (votingDataId: string, select?: VotingDa
     select: select || {
       votingDataId: true,
       borough: true,
-      wardName: true,
       year: true,
       party: true,
-      votes: true,
       percentage: true,
+      source: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -81,11 +80,10 @@ export const findAllVotingData = async (
     select: select || {
       votingDataId: true,
       borough: true,
-      wardName: true,
       year: true,
       party: true,
-      votes: true,
       percentage: true,
+      source: true,
     },
   }).catch(err => {
     logContext.function = 'findAllVotingData';

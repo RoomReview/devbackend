@@ -44,7 +44,7 @@ export const getUserById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const user = await userService.findUserById(id, defaultSelectFields);
   if (!user) {
     throw new EntityNotFoundError({
@@ -81,7 +81,7 @@ export const updateUser = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const updatedUser = await userService.updateUser(id, req.body as UpdateUserProfileDto);
 
   const response: ApiResponse<typeof updatedUser> = {
@@ -97,7 +97,7 @@ export const deleteUser = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await userService.deleteUser(id);
 
   const response: ApiResponse<null> = {
@@ -112,7 +112,7 @@ export const activateUser = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   // Activate user by setting isActive = true
   const updatedUser = await userService.updateUser(id, { isActive: true } as any);
 
@@ -129,7 +129,7 @@ export const changePassword = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { userId } = req.params;
+  const { userId } = req.params as any;
   await userService.changePassword(userId as string, req.body);
 
   const response: ApiResponse<null> = {

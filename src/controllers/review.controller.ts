@@ -34,7 +34,7 @@ export const getReviewById = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await reviewService.getReviewById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -66,7 +66,7 @@ export const updateReview = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   const data = await reviewService.updateReviewById(id, req.body as UpdateReviewDto, userId, role);
@@ -84,7 +84,7 @@ export const updateReviewStatus = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await reviewService.updateReviewStatusById(id, req.body as UpdateReviewStatusDto);
 
   const response: ApiResponse<typeof data> = {
@@ -100,7 +100,7 @@ export const deleteReview = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   await reviewService.deleteReviewById(id, userId, role);

@@ -29,7 +29,7 @@ export const getDemographyById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await demoService.getDemographyById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -75,7 +75,7 @@ export const updateDemography = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await demoService.updateDemographyById(id, req.body as UpdateDemographyDto);
 
   const response: ApiResponse<typeof data> = {
@@ -91,7 +91,7 @@ export const deleteDemography = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await demoService.deleteDemographyById(id);
 
   const response: ApiResponse<null> = {

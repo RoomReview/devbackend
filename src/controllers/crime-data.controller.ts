@@ -30,7 +30,7 @@ export const getCrimeDataById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await crimeService.getCrimeDataById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -76,7 +76,7 @@ export const updateCrimeData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await crimeService.updateCrimeDataById(id, req.body as UpdateCrimeDataDto);
 
   const response: ApiResponse<typeof data> = {
@@ -92,7 +92,7 @@ export const deleteCrimeData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await crimeService.deleteCrimeDataById(id);
 
   const response: ApiResponse<null> = {

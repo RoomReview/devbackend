@@ -33,7 +33,7 @@ export const getBlogPostById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await blogPostService.getBlogPostById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -49,7 +49,7 @@ export const getBlogPostBySlug = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { slug } = req.params;
+  const { slug } = req.params as any;
   const data = await blogPostService.getBlogPostBySlug(slug);
 
   const response: ApiResponse<typeof data> = {
@@ -80,7 +80,7 @@ export const updateBlogPost = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await blogPostService.updateBlogPostById(id, req.body as UpdateBlogPostDto);
 
   const response: ApiResponse<typeof data> = {
@@ -96,7 +96,7 @@ export const deleteBlogPost = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await blogPostService.deleteBlogPostById(id);
 
   const response: ApiResponse<null> = {

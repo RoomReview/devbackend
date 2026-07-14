@@ -4,14 +4,13 @@ import {
   findUserCreditsById,
   updateUserCredits,
 } from '@/repositories/user-credits.repository';
-import { createTransaction } from '@/repositories/credit-transaction.repository';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
 import type { UpdateUserCreditsDto } from '@/dto/user-credits.dto';
 import { SubscriptionPlan, TransactionType } from '@/generated/prisma/enums';
 import prisma from '@config/database';
 
 export const getUserCreditsByUserId = async (userId: string) => {
-  let credits = await findUserCreditsByUserId(userId);
+  let credits: any = await findUserCreditsByUserId(userId);
   if (!credits) {
     // Automatically create default free credits profile if none exists
     credits = await createUserCredits({

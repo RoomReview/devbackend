@@ -31,7 +31,7 @@ export const getLocalPlanById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await planService.getLocalPlanById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -62,7 +62,7 @@ export const updateLocalPlan = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await planService.updateLocalPlanById(id, req.body as UpdateLocalPlanDto);
 
   const response: ApiResponse<typeof data> = {
@@ -78,7 +78,7 @@ export const deleteLocalPlan = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await planService.deleteLocalPlanById(id);
 
   const response: ApiResponse<null> = {

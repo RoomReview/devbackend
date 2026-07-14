@@ -35,7 +35,7 @@ export const getTransactionById = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await creditService.getTransactionById(id);
   const userCredits = await creditsService.getUserCreditsById(data.userCreditsId);
   validateOwnerOrAdmin(req, userCredits.userId);
@@ -53,7 +53,7 @@ export const getUserTransactions = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { userId } = req.params;
+  const { userId } = req.params as any;
   validateOwnerOrAdmin(req, userId);
 
   const page = Number(req.query.page) || 1;

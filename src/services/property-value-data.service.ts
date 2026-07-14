@@ -35,10 +35,9 @@ export const getPropertyValueDataById = async (id: string) => {
 export const createNewPropertyValueData = async (data: CreatePropertyValueDataDto) => {
   return await createPropertyValueData({
     postcode: data.postcode,
-    averageValue: data.averageValue,
-    growthRate: data.growthRate,
-    salesVolume: data.salesVolume,
-    recordedDate: new Date(data.recordedDate),
+    value: data.value,
+    date: new Date(data.date),
+    source: data.source,
   });
 };
 
@@ -46,10 +45,9 @@ export const bulkCreatePropertyValueData = async (data: CreatePropertyValueDataD
   return await createManyPropertyValueData(
     data.map(item => ({
       postcode: item.postcode,
-      averageValue: item.averageValue,
-      growthRate: item.growthRate,
-      salesVolume: item.salesVolume,
-      recordedDate: new Date(item.recordedDate),
+      value: item.value,
+      date: new Date(item.date),
+      source: item.source,
     }))
   );
 };
@@ -59,10 +57,9 @@ export const updatePropertyValueDataById = async (id: string, data: UpdateProper
 
   const updateData: any = {
     postcode: data.postcode,
-    averageValue: data.averageValue,
-    growthRate: data.growthRate,
-    salesVolume: data.salesVolume,
-    recordedDate: data.recordedDate ? new Date(data.recordedDate) : undefined,
+    value: data.value,
+    date: data.date ? new Date(data.date) : undefined,
+    source: data.source,
   };
 
   return await updatePropertyValueData(id, updateData);

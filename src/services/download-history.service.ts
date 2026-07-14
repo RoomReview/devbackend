@@ -1,5 +1,4 @@
 import {
-  createDownloadHistory,
   findDownloadHistoryById,
   findAllDownloadHistoryByUserCreditsId,
   countDownloadHistoryByUserCreditsId,

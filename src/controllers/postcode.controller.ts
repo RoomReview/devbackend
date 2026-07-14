@@ -31,7 +31,7 @@ export const getPostcodeById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await postcodeService.getPostcodeById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -47,7 +47,7 @@ export const getPostcodeByCode = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { code } = req.params;
+  const { code } = req.params as any;
   const data = await postcodeService.getPostcodeByCode(code);
 
   const response: ApiResponse<typeof data> = {
@@ -78,7 +78,7 @@ export const updatePostcode = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await postcodeService.updatePostcodeById(id, req.body as UpdatePostcodeDto);
 
   const response: ApiResponse<typeof data> = {
@@ -94,7 +94,7 @@ export const deletePostcode = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await postcodeService.deletePostcodeById(id);
 
   const response: ApiResponse<null> = {

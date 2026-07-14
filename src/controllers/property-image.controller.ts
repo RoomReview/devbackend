@@ -7,7 +7,7 @@ export const getImagesByPropertyId = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { propertyId } = req.params;
+  const { propertyId } = req.params as any;
   const data = await propertyImageService.getImagesByPropertyId(propertyId);
 
   const response: ApiResponse<typeof data> = {
@@ -23,7 +23,7 @@ export const createImage = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { propertyId } = req.params;
+  const { propertyId } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   const data = await propertyImageService.createImage(propertyId, req.body as CreatePropertyImageDto, userId, role);
@@ -41,7 +41,7 @@ export const updateImage = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { imageId } = req.params;
+  const { imageId } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   const data = await propertyImageService.updateImage(imageId, req.body as UpdatePropertyImageDto, userId, role);
@@ -59,7 +59,7 @@ export const deleteImage = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { imageId } = req.params;
+  const { imageId } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   await propertyImageService.deleteImage(imageId, userId, role);

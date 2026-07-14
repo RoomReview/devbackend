@@ -31,7 +31,7 @@ export const getVotingDataById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await votingService.getVotingDataById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -77,7 +77,7 @@ export const updateVotingData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await votingService.updateVotingDataById(id, req.body as UpdateVotingDataDto);
 
   const response: ApiResponse<typeof data> = {
@@ -93,7 +93,7 @@ export const deleteVotingData = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   await votingService.deleteVotingDataById(id);
 
   const response: ApiResponse<null> = {

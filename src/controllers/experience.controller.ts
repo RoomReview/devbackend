@@ -35,7 +35,7 @@ export const getExperienceById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await experienceService.getExperienceById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -80,7 +80,7 @@ export const updateExperience = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   const data = await experienceService.updateExperienceById(id, req.body as UpdateExperienceDto, userId, role);
@@ -98,7 +98,7 @@ export const updateExperienceStatus = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const data = await experienceService.updateExperienceStatusById(id, req.body as UpdateExperienceStatusDto);
 
   const response: ApiResponse<typeof data> = {
@@ -114,7 +114,7 @@ export const deleteExperience = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.params as any;
   const userId = req.user!.userId;
   const role = req.user!.role;
   await experienceService.deleteExperienceById(id, userId, role);
