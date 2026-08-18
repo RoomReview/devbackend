@@ -4,10 +4,10 @@ import {
   ResetPasswordDto,
 } from '@/dto/auth.dto';
 import {
-  createUser,
   findUserByEmail,
   getUserSensitiveByEmail,
   updateUserPasswordAndClearCode,
+  registerUser as createUserAccount,
 } from './user.service';
 import { comparePassword, hashPassword } from '../utils/password';
 import {
@@ -20,7 +20,6 @@ import {
   findUserSessionByAccessTokenId,
   findUserSessionByRefreshTokenId,
   logoutSessionByUserId,
-  updateSessionAccessTokenId,
   upsertSession,
 } from '@/repositories/sessions.repository';
 import {
@@ -53,39 +52,49 @@ const logContext: LogContext = {
 
 export const registerUser = async (data: RegisterUserDto) => {
   logContext.function = 'registerUser';
-  // is user already exist
   const existingUser = await findUserByEmail(data.email);
   if (existingUser) {
-    return { user: existingUser, session: {}, isExistingUser: true };
+    throw new ValidationError({
+      message: 'This email address is already taken',
+      code: 'VALIDATION_ERROR',
+    });
   }
 
-  // hash password
   const hashedPassword = await hashPassword(data.password);
 
-  // generate verification token
   const token = generateVerificationCode();
 
   logger.info(logContext, 'Verification token generated', { token });
 
-  // TODO: send the verification email with code
-  await sendVerificationEmail(data.email, token.code, `${data.firstName} ${data.lastName}`);
+  let emailSent = false;
+  try {
+    await sendVerificationEmail(
+      data.email,
+      token.code,
+      `${data.firstName} ${data.lastName}`,
+    );
+    emailSent = true;
+  } catch (error) {
+    logger.warn(logContext, 'Verification email could not be sent; continuing registration', {
+      email: data.email,
+      error,
+    });
+  }
 
-  // create user
-  const user = await createUser({
-    email: data.email,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    verifyCodeExpiry: token.expiresAt,
-    verifyCodeHash: token.hashedCode,
-    passwordHash: hashedPassword,
-    isEmailVerified: false,
-    isActive: true,
+  const user = await createUserAccount(data, hashedPassword, {
+    expiresAt: token.expiresAt,
+    hashedCode: token.hashedCode,
   });
 
+  const { passwordHash, verifyCodeHash, ...userWithoutSensitive } = user;
 
-  // TBD: create session (Why register api return session(access&refresh tokens) without email verified)
-
-  return { user, session: {}, isExistingUser: false };
+  return {
+    user: userWithoutSensitive,
+    session: {},
+    isExistingUser: false,
+    emailSent,
+    verificationCode: emailSent ? undefined : token.code,
+  };
 };
 
 export const loginUser = async (email: string, password: string) => {
@@ -119,7 +128,6 @@ export const loginUser = async (email: string, password: string) => {
     role: user.role,
   });
 
-  // TBD: Does application allow multiple sessions? If not, we can update the existing session instead of creating new one
   const currentSession = await upsertSession({
     userId: user.userId,
     accessTokenId: accessTokenObj?.jti ?? null,
@@ -164,7 +172,6 @@ export const resetEmailVerification = async (email: string) => {
 
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
 
-  // TODO: replace with actual email send once email service is integrated
   logger.info(logContext, 'Verification code reset — dev-only log', {
     email,
     code: token.code,
@@ -196,7 +203,6 @@ export const forgotPassword = async (email: string) => {
   await sendResetPasswordEmail(email, user.firstName + ' ' + user.lastName, resetPasswordUrl);
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
 
-  // TODO: Send password reset email with the 6-digit code `token.code`
   logger.info(logContext, 'Password reset code generated — dev-only log', {
     email,
     code: token.code,
@@ -220,8 +226,6 @@ export const resetPassword = async (data: ResetPasswordDto) => {
     });
   }
 
-  // Note: we fetch the full user from findUserByVerifyCodeHash so we don't need to re-fetch
-  // Wait, let's fetch full user details just to be safe they are active
   const fullUser = await findUserByEmail(email);
   if (!fullUser?.isActive) {
     throw new ValidationError({
@@ -247,7 +251,6 @@ export const resetPassword = async (data: ResetPasswordDto) => {
   const newHashedPassword = await hashPassword(newPassword);
   await updateUserPasswordAndClearCode(user.userId, newHashedPassword);
 
-  // TODO: send password reset confirmation email
 
   return { success: true };
 };
@@ -307,21 +310,11 @@ export const validateAccessToken = async (token: string) => {
   return { user: { email, role, userId: sub }, session };
 };
 
-export const refreshAccessToken = async (
-  userId: string,
-  refreshToken: string,
-) => {
+export const refreshAccessToken = async (refreshToken: string) => {
   logContext.function = 'refreshAccessToken';
 
   // Verify signature, expiry, issuer & audience — throws UnauthorizedError on failure
-  const { sub, email, role, jti } = verifyRefreshToken(refreshToken);
-
-  // Defence-in-depth: confirm JWT subject matches the supplied userId
-  if (sub !== userId) {
-    throw new UnauthorizedError({
-      message: 'Token does not match the provided userId',
-    });
-  }
+  const { sub: userId, email, role, jti } = verifyRefreshToken(refreshToken);
 
   if (!jti) {
     throw new UnauthorizedError({
@@ -337,20 +330,24 @@ export const refreshAccessToken = async (
     });
   }
 
-  // Issue a fresh access token
+  // Issue fresh access and refresh tokens
   const accessTokenObj = generateAccessToken({ email, sub: userId, role });
+  const refreshTokenObj = generateRefreshToken({ email, sub: userId, role });
 
-  // Persist the new access token JTI + expiry on the session
-  await updateSessionAccessTokenId({
-    sessionId: session.sessionId,
+  // Persist the new access token and refresh token JTI + expiry on the session
+  await upsertSession({
+    userId,
     accessTokenId: accessTokenObj.jti ?? null,
     accessTokenExpiry: accessTokenObj.expiresAt ?? null,
+    refreshTokenId: refreshTokenObj.jti ?? null,
+    refreshTokenExpiry: refreshTokenObj.expiresAt ?? null,
   });
 
   logger.info(logContext, 'Access token refreshed', { userId });
 
   return {
     accessToken: accessTokenObj.token,
+    refreshToken: refreshTokenObj.token,
     expiresAt: accessTokenObj.expiresAt,
   };
 };
@@ -431,7 +428,7 @@ export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
   return {
     user,
     session: {
-      ...currentSession,
+      currentSession,
       accessToken: accessTokenObj.token,
       refreshToken: refreshTokenObj.token,
     },
