@@ -7,8 +7,14 @@ const logContext: LogContext = {
   function: '',
 };
 
-export const createUser = async (user: UserCreateInput) => {
-  return await prisma.user.create({ data: user }).catch(err => {
+export const createUser = async (
+  user: UserCreateInput,
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends' | '$transaction'
+  > = prisma,
+) => {
+  return await tx.user.create({ data: user }).catch(err => {
     logContext.function = 'createUser';
     logger.error(logContext, 'Error in createUser repository', { error: err });
     throw new Error('DB: user create operation failed');
@@ -17,9 +23,12 @@ export const createUser = async (user: UserCreateInput) => {
 
 export const findUserByEmail = async (email: string, select?: UserSelect) => {
   return await prisma.user.findUnique({ where: { email }, select }).catch(err => {
+    // eslint-disable-next-line no-console
+    console.error('Prisma raw error in findUserByEmail:', err);
     logContext.function = 'findUserByEmail';
     logger.error(logContext, 'Error in findUserByEmail repository', { error: err });
-    throw new Error('DB: findUserByEmail operation failed');
+    // Include underlying error message to aid debugging in development
+    throw new Error(`DB: findUserByEmail operation failed: ${err?.message ?? 'unknown error'}`);
   });
 };
 
@@ -233,4 +242,3 @@ export const upsertSsoUser = async (data: SsoUpsertInput) => {
     throw new Error('DB: upsertSsoUser operation failed');
   });
 };
-
