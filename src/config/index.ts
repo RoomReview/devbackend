@@ -6,14 +6,11 @@ export const config = {
   port: process.env.PORT ?? 5000,
   nodeEnv: process.env.NODE_ENV ?? 'development',
   databaseUrl: process.env.DATABASE_URL ?? '',
-  // Access token
   jwtSecret: process.env.JWT_SECRET ?? 'your-secret-key',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
-  // Refresh token
   jwtRefreshTokenSecret:
     process.env.JWT_REFRESH_SECRET ?? 'your-refresh-secret-key',
   jwtRefreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
-  // Standard JWT claims (iss / aud)
   jwtIssuer: process.env.JWT_ISSUER ?? 'roomreview-api',
   jwtAccessTokenAudience:
     process.env.JWT_ACCESS_TOKEN_AUDIENCE ?? 'roomreview-client',
@@ -22,7 +19,6 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   saltKeyLength: 16,
   passwordHashLength: 64,
-  // Email - Provider (Sendgrid)
   sendGridApiKey: process.env.SENDGRID_API_KEY ?? '',
   emailFrom: process.env.EMAIL_FROM ?? '',
   sendGridSandboxMode: process.env.SENDGRID_SANDBOX_MODE === 'false' ? false : true,
@@ -40,18 +36,14 @@ export const config = {
       reset_pswd_button_link: process.env.ROOMREVIEW_RESET_PASSWORD_LINK ?? '/',
     }
   },
-  // SSO
   enableGoogleSSO: process.env.ENABLE_GOOGLE_SSO === 'true' ? true : false,
   enableFacebookSSO: process.env.ENABLE_FACEBOOK_SSO === 'true' ? true : false,
-  // SSO — Google
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
   googleCallbackUrl: process.env.GOOGLE_CALLBACK_URL ?? 'http://localhost:5000/api/v1/sso/google/callback',
-  // SSO — Facebook
   facebookAppId: process.env.FACEBOOK_APP_ID ?? '',
   facebookAppSecret: process.env.FACEBOOK_APP_SECRET ?? '',
   facebookCallbackUrl: process.env.FACEBOOK_CALLBACK_URL ?? 'http://localhost:5000/api/v1/sso/facebook/callback',
-  // Frontend redirect after OAuth
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
 } as const;
 
