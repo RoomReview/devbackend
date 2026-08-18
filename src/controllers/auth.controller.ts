@@ -22,16 +22,14 @@ export const register = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { user, session, isExistingUser } = await registerUser(req.body);
+    const { user, session } = await registerUser(req.body);
     const resultant: ApiResponse<{
       user: typeof user;
       session: typeof session;
     }> = {
       success: true,
-      statusCode: isExistingUser ? 202 : 201,
-      message: isExistingUser
-        ? 'User already exists'
-        : 'User registered successfully',
+      statusCode: 201,
+      message: 'User registered successfully',
       data: {
         user,
         session,
@@ -138,22 +136,23 @@ export const refresh = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { userId, refreshToken } = req.body as {
-      userId: string;
+    const { refreshToken } = req.body as {
       refreshToken: string;
     };
-    const { accessToken, expiresAt } = await refreshAccessToken(
-      userId,
+    const { accessToken, refreshToken: newRefreshToken, expiresAt } = await refreshAccessToken(
       refreshToken,
     );
     const resultant: ApiResponse<{
-      accessToken: string;
-      expiresAt: Date | undefined;
+      session: {
+        accessToken: string;
+        refreshToken: string;
+        expiresAt: Date | undefined;
+      };
     }> = {
       success: true,
       statusCode: 200,
       message: 'Access token refreshed successfully',
-      data: { accessToken, expiresAt },
+      data: { session: { accessToken, refreshToken: newRefreshToken, expiresAt } },
     };
     return res.status(200).json(resultant);
   } catch (error) {
@@ -211,13 +210,11 @@ export const getMe = async (
 ): Promise<Response> => {
   try {
     const { user } = req;
-    const resultant: ApiResponse<{
-      user: Omit<typeof user, 'accessTokenId'>;
-    }> = {
+    const resultant: ApiResponse<Omit<typeof user, 'accessTokenId'>> = {
       success: true,
       statusCode: 200,
       message: 'User fetched successfully',
-      data: { user: { ...user, accessTokenId: undefined } },
+      data: { ...user, accessTokenId: undefined },
     };
     return res.status(200).json(resultant);
   } catch (error) {
