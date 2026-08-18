@@ -1,16 +1,15 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { parseArgs } from "node:util";
+import path from "path";
+import { fileURLToPath } from "url";
+import { parseArgs } from "util";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const seedsPath = path.join(__dirname, "../seeds");
 const options = {
     environment: { type: "string", default: "development" },
     seed: { type: "string", multiple: true },
 } as const;
 
-const { values, positionals } = parseArgs({
+const { values } = parseArgs({
     options,
     strict: true,
 });
