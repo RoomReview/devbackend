@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -14,29 +8,35 @@ datasource db {
 }
 
 model User {
-  userId           String    @id @default(uuid(7)) @map("user_id") @db.Uuid
-  email            String    @unique
-  firstName        String    @map("first_name")
-  lastName         String    @map("last_name")
-  passwordHash     String?   @map("password_hash")
-  isEmailVerified  Boolean   @default(false) @map("is_email_verified")
-  isActive         Boolean   @default(true) @map("is_active")
-  role             UserRole  @default(TENANT)
-  verifyCodeHash   String?   @map("verify_code_hash")
-  verifiedAt       DateTime? @map("verified_at")
-  verifyCodeExpiry DateTime? @map("verify_code_expiry")
-  googleId         String?   @unique @map("google_id")
-  facebookId       String?   @unique @map("facebook_id")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  userId           String             @id @default(uuid(7)) @map("user_id") @db.Uuid
+  email            String             @unique
+  firstName        String             @map("first_name")
+  lastName         String             @map("last_name")
+  phone            String?
+  avatar           String?
+  bio              String?
+  passwordHash     String?            @map("password_hash")
+  isEmailVerified  Boolean            @default(false) @map("is_email_verified")
+  isActive         Boolean            @default(true) @map("is_active")
+  role             UserRole           @default(TENANT)
+  verifyCodeHash   String?            @map("verify_code_hash")
+  verifiedAt       DateTime?          @map("verified_at")
+  verifyCodeExpiry DateTime?          @map("verify_code_expiry")
+  googleId         String?            @unique @map("google_id")
+  facebookId       String?            @unique @map("facebook_id")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  experiences      experiences[]
+  properties       properties[]
+  reviews          reviews[]
+  saved_properties saved_properties[]
+  sessions         Session?
+  agencies         UserAgency[]
+  user_credits     user_credits?
 
+  @@index([email])
+  @@index([role])
   @@map("users")
-}
-
-enum UserRole {
-  TENANT
-  LANDLORD
-  ADMIN
 }
 
 model Session {
@@ -48,6 +48,600 @@ model Session {
   refreshTokenExpiry DateTime? @map("refresh_token_expiry")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
+  users              User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model Agency {
+  agencyId    String       @id @default(uuid(7)) @map("agency_id") @db.Uuid
+  name        String
+  description String?
+  email       String?      @unique
+  phone       String?
+  website     String?
+  isVerified  Boolean      @default(false) @map("is_verified")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  users       UserAgency[]
+
+  @@map("agencies")
+}
+
+model UserAgency {
+  userAgencyId String   @id @default(uuid(7)) @map("user_agency_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  agencyId     String   @map("agency_id") @db.Uuid
+  isVerified   Boolean  @default(false) @map("is_verified")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  agency       Agency   @relation(fields: [agencyId], references: [agencyId], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, agencyId])
+  @@map("user_agency")
+}
+
+model Borough {
+  boroughId   String     @id @default(uuid(7)) @map("borough_id")
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  image       String?
+  latitude    Float?
+  longitude   Float?
+  metrics     Json       @default("{}")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  postcodes   Postcode[]
+  scoreReports ScoreReport[]
+  reviews     reviews[]
+
+  @@index([slug])
+  @@map("boroughs")
+}
+
+model Postcode {
+  postcodeId  String        @id @default(uuid(7)) @map("postcode_id")
+  code        String        @unique
+  outcode     String
+  incode      String
+  latitude    Float?
+  longitude   Float?
+  metrics     Json          @default("{}")
+  boroughId   String?       @map("borough_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  experiences experiences[]
+  borough     Borough?      @relation(fields: [boroughId], references: [boroughId])
+  properties  properties[]
+  reviews     reviews[]
+  scoreReports ScoreReport[]
+
+  @@index([boroughId])
+  @@index([code])
+  @@index([outcode])
+  @@map("postcodes")
+}
+
+enum ScoreStatus {
+  WAITING
+  GENERATING
+  READY
+  FAILED
+}
+
+model ScoreReport {
+  scoreReportId String        @id @default(uuid(7)) @map("score_report_id")
+  boroughId     String?       @map("borough_id")
+  postcodeId    String?       @map("postcode_id")
+  name          String?
+  description   String?
+  status        ScoreStatus   @default(WAITING)
+  overallScore  Float?
+  boroughScore  Float?
+  postcodeScore Float?
+  scoreBreakdown Json?
+  reportData    Json?
+  failureReason String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  borough      Borough?   @relation(fields: [boroughId], references: [boroughId])
+  postcode     Postcode?  @relation(fields: [postcodeId], references: [postcodeId])
+
+  @@map("score_reports")
+}
+
+model ai_interactions {
+  ai_interaction_id String       @id @db.Uuid
+  user_credits_id   String       @db.Uuid
+  query             String
+  response          String
+  postcode          String?
+  borough           String?
+  tokens_used       Int?
+  credits_used      Int
+  downloaded        Boolean      @default(false)
+  created_at        DateTime     @default(now())
+  updated_at        DateTime
+  user_credits      user_credits @relation(fields: [user_credits_id], references: [user_credits_id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([user_credits_id])
+}
+
+model blog_categories {
+  blog_category_id String       @id @db.Uuid
+  name             String       @unique
+  slug             String       @unique
+  description      String?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime
+  blog_posts       blog_posts[]
+
+  @@index([slug])
+}
+
+model blog_posts {
+  blog_post_id     String           @id @db.Uuid
+  title            String
+  slug             String           @unique
+  excerpt          String
+  content          String
+  featured_image   String?
+  read_time        Int?
+  status           BlogStatus       @default(DRAFT)
+  category_id      String?          @db.Uuid
+  meta_title       String?
+  meta_description String?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime
+  published_at     DateTime?
+  blog_categories  blog_categories? @relation(fields: [category_id], references: [blog_category_id])
+  blog_tags        blog_tags[]      @relation("BlogPostToBlogTag")
+
+  @@index([category_id])
+  @@index([published_at])
+  @@index([slug])
+  @@index([status])
+}
+
+model blog_tags {
+  blog_tag_id String       @id @db.Uuid
+  name        String       @unique
+  slug        String       @unique
+  created_at  DateTime     @default(now())
+  updated_at  DateTime
+  blog_posts  blog_posts[] @relation("BlogPostToBlogTag")
+
+  @@index([slug])
+}
+
+model contact_inquiries {
+  contact_inquiry_id String        @id @db.Uuid
+  name               String
+  email              String
+  subject            String
+  message            String
+  status             InquiryStatus @default(NEW)
+  admin_notes        String?
+  created_at         DateTime      @default(now())
+  updated_at         DateTime
+
+  @@index([created_at])
+  @@index([status])
+}
+
+model credit_transactions {
+  credit_transaction_id String          @id @db.Uuid
+  user_credits_id       String          @db.Uuid
+  amount                Int
+  type                  TransactionType
+  description           String
+  balance_after         Int
+  created_at            DateTime        @default(now())
+  updated_at            DateTime
+  user_credits          user_credits    @relation(fields: [user_credits_id], references: [user_credits_id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([user_credits_id])
+}
+
+model crime_data {
+  crime_data_id String   @id @db.Uuid
+  borough       String
+  crime_type    String?
+  crime_rate    Decimal  @db.Decimal(10, 2)
+  date          DateTime
+  source        String
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+
+  @@index([borough])
+  @@index([date])
+}
+
+model demography {
+  demography_id String   @id @db.Uuid
+  postcode      String
+  age_group     String
+  percentage    Decimal  @db.Decimal(5, 2)
+  date          DateTime
+  source        String
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+
+  @@index([date])
+  @@index([postcode])
+}
+
+model download_history {
+  download_history_id String       @id @db.Uuid
+  user_credits_id     String       @db.Uuid
+  report_type         ReportType
+  format              String
+  postcode            String?
+  borough             String?
+  credits_used        Int
+  created_at          DateTime     @default(now())
+  updated_at          DateTime
+  user_credits        user_credits @relation(fields: [user_credits_id], references: [user_credits_id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([user_credits_id])
+}
+
+model experiences {
+  experience_id      String           @id @db.Uuid
+  type               ExperienceType
+  title              String
+  story              String
+  landlord_name      String?
+  agent_name         String?
+  year_of_experience Int?
+  anonymous          Boolean          @default(true)
+  contact_email      String?
+  status             ExperienceStatus @default(PENDING)
+  admin_notes        String?
+  author_id          String?          @db.Uuid
+  postcode_id        String?
+  created_at         DateTime         @default(now())
+  updated_at         DateTime
+  published_at       DateTime?
+  users              User?            @relation(fields: [author_id], references: [userId])
+  postcodes          Postcode?        @relation(fields: [postcode_id], references: [postcodeId])
+
+  @@index([postcode_id])
+  @@index([status])
+}
+
+model local_plans {
+  local_plan_id   String   @id @db.Uuid
+  borough         String
+  category        String
+  summary         String
+  indicator       String?
+  forecast_change String?
+  source          String
+  created_at      DateTime @default(now())
+  updated_at      DateTime
+
+  @@index([borough])
+  @@index([category])
+}
+
+model newsletter_subscribers {
+  newsletter_subscriber_id String   @id @db.Uuid
+  email                    String   @unique
+  confirmed                Boolean  @default(false)
+  confirm_token            String?
+  created_at               DateTime @default(now())
+  updated_at               DateTime
+
+  @@index([email])
+}
+
+model properties {
+  property_id      String             @id @db.Uuid
+  title            String
+  description      String
+  type             PropertyType
+  listing_type     ListingType
+  price            Decimal            @db.Decimal(12, 2)
+  price_frequency  PriceFrequency     @default(MONTHLY)
+  bedrooms         Int                @db.SmallInt
+  bathrooms        Int                @db.SmallInt
+  size             Int?
+  furnished        FurnishedType      @default(UNFURNISHED)
+  address          String
+  latitude         Float?
+  longitude        Float?
+  features         String[]
+  available_from   DateTime?
+  min_tenancy      String?
+  deposit          Decimal?           @db.Decimal(12, 2)
+  bills            BillsIncluded      @default(EXCLUDED)
+  epc_rating       String?
+  floor_plan       String?
+  verified         Boolean            @default(false)
+  featured         Boolean            @default(false)
+  status           PropertyStatus     @default(ACTIVE)
+  view_count       Int                @default(0)
+  landlord_id      String             @db.Uuid
+  postcode_id      String
+  created_at       DateTime           @default(now())
+  updated_at       DateTime
+  users            User               @relation(fields: [landlord_id], references: [userId], onDelete: Cascade)
+  postcodes        Postcode           @relation(fields: [postcode_id], references: [postcodeId])
+  property_images  property_images[]
+  saved_properties saved_properties[]
+
+  @@index([bedrooms])
+  @@index([landlord_id])
+  @@index([listing_type])
+  @@index([postcode_id])
+  @@index([price])
+  @@index([status])
+  @@index([type])
+}
+
+model property_images {
+  property_image_id String     @id @db.Uuid
+  url               String
+  alt               String?
+  order             Int        @default(0)
+  property_id       String     @db.Uuid
+  created_at        DateTime   @default(now())
+  updated_at        DateTime
+  properties        properties @relation(fields: [property_id], references: [property_id], onDelete: Cascade)
+
+  @@index([property_id])
+}
+
+model property_valuations {
+  property_valuation_id String            @id @db.Uuid
+  user_credits_id       String            @db.Uuid
+  postcode              String
+  property_type         String
+  bedrooms              Int
+  bathrooms             Int
+  floor_area            Int?
+  year_built            Int?
+  condition             PropertyCondition @default(AVERAGE)
+  current_valuation     Decimal?          @db.Decimal(12, 2)
+  forecast_valuation    Decimal?          @db.Decimal(12, 2)
+  forecast_date         DateTime?
+  ai_summary            String?
+  credits_used          Int
+  created_at            DateTime          @default(now())
+  updated_at            DateTime
+  user_credits          user_credits      @relation(fields: [user_credits_id], references: [user_credits_id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([postcode])
+  @@index([user_credits_id])
+}
+
+model property_value_data {
+  property_value_data_id String   @id @db.Uuid
+  postcode               String
+  value                  Decimal  @db.Decimal(12, 2)
+  date                   DateTime
+  source                 String
+  created_at             DateTime @default(now())
+  updated_at             DateTime
+
+  @@index([date])
+  @@index([postcode])
+}
+
+model rent_data {
+  rent_data_id  String   @id @db.Uuid
+  postcode      String
+  property_type String
+  rent          Decimal  @db.Decimal(12, 2)
+  date          DateTime
+  source        String
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+
+  @@index([date])
+  @@index([postcode])
+  @@index([property_type])
+}
+
+model reviews {
+  review_id        String       @id @db.Uuid
+  title            String
+  content          String
+  safety_rating    Int          @db.SmallInt
+  transport_rating Int          @db.SmallInt
+  amenities_rating Int          @db.SmallInt
+  value_rating     Int          @db.SmallInt
+  overall_rating   Float
+  pros             String[]
+  cons             String[]
+  years_lived      Int?
+  anonymous        Boolean      @default(false)
+  verified         Boolean      @default(false)
+  status           ReviewStatus @default(PENDING)
+  rejection_reason String?
+  author_id        String       @db.Uuid
+  postcode_id      String?
+  borough_id       String?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime
+  published_at     DateTime?
+  users            User         @relation(fields: [author_id], references: [userId], onDelete: Cascade)
+  boroughs         Borough?     @relation(fields: [borough_id], references: [boroughId])
+  postcodes        Postcode?    @relation(fields: [postcode_id], references: [postcodeId])
+
+  @@index([author_id])
+  @@index([borough_id])
+  @@index([created_at])
+  @@index([postcode_id])
+  @@index([status])
+}
+
+model saved_properties {
+  saved_property_id String     @id @db.Uuid
+  user_id           String     @db.Uuid
+  property_id       String     @db.Uuid
+  created_at        DateTime   @default(now())
+  updated_at        DateTime
+  properties        properties @relation(fields: [property_id], references: [property_id], onDelete: Cascade)
+  users             User       @relation(fields: [user_id], references: [userId], onDelete: Cascade)
+
+  @@unique([user_id, property_id])
+  @@index([user_id])
+}
+
+model user_credits {
+  user_credits_id     String                @id @db.Uuid
+  user_id             String                @unique @db.Uuid
+  credits_balance     Int                   @default(15)
+  subscription_plan   SubscriptionPlan      @default(FREE)
+  ai_summary_used     Int                   @default(0)
+  ai_summary_limit    Int                   @default(0)
+  plan_expires_at     DateTime?
+  created_at          DateTime              @default(now())
+  updated_at          DateTime
+  ai_interactions     ai_interactions[]
+  credit_transactions credit_transactions[]
+  download_history    download_history[]
+  property_valuations property_valuations[]
+  users               User                  @relation(fields: [user_id], references: [userId], onDelete: Cascade)
+}
+
+model voting_data {
+  voting_data_id String   @id @db.Uuid
+  borough        String
+  year           Int
+  party          String
+  percentage     Decimal  @db.Decimal(5, 2)
+  source         String
+  created_at     DateTime @default(now())
+  updated_at     DateTime
+
+  @@index([borough])
+  @@index([year])
+}
+
+enum UserRole {
+  TENANT
+  LANDLORD
+  ADMIN
+  AGENCY
+  AGENT
+}
+
+enum BillsIncluded {
+  INCLUDED
+  EXCLUDED
+  PARTIAL
+}
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ExperienceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FEATURED
+}
+
+enum ExperienceType {
+  POSITIVE
+  NEGATIVE
+  WARNING
+  NEUTRAL
+}
+
+enum FurnishedType {
+  FURNISHED
+  UNFURNISHED
+  PART_FURNISHED
+}
+
+enum InquiryStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ListingType {
+  FOR_RENT
+  FOR_SALE
+}
+
+enum PriceFrequency {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum PropertyCondition {
+  NEW_BUILD
+  EXCELLENT
+  GOOD
+  AVERAGE
+  NEEDS_WORK
+  RENOVATION_REQUIRED
+}
+
+enum PropertyStatus {
+  ACTIVE
+  PENDING
+  SOLD
+  LET
+  WITHDRAWN
+}
+
+enum PropertyType {
+  FLAT
+  HOUSE
+  ROOM
+  STUDIO
+  MAISONETTE
+  BUNGALOW
+}
+
+enum ReportType {
+  BASE
+  EXTENDED
+  ADVANCED
+  FULL_SINGLE
+  FULL_DOUBLE
+  VALUATION
+  AI_SUMMARY
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  STANDARD
+  PRO
+  PREMIUM
+}
+
+enum TransactionType {
+  PURCHASE
+  SUBSCRIPTION
+  DOWNLOAD
+  AI_SUMMARY
+  VALUATION
+  REFUND
+  BONUS
 }
