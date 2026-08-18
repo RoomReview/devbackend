@@ -109,7 +109,7 @@ async function runGenerate() {
 async function runInit(name) {
   const migrationName = name || 'init';
   console.log(`📦  Creating migration: "${migrationName}"...`);
-  shell(`npx prisma migrate dev --name ${migrationName}`);
+  shell(`npx prisma migrate dev --create-only --name ${migrationName}`);
   console.log(`✅  Migration "${migrationName}" created and applied.`);
   console.log(
     `\n📝  Tip: author a down.sql in the new migration folder to enable rollback.\n`,
