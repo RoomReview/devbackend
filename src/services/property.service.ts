@@ -1,5 +1,3 @@
-// Property service - Business logic for properties
-
 export interface Property {
   id: string;
   address: string;
@@ -11,7 +9,6 @@ export interface Property {
 }
 
 export const findAllProperties = async (): Promise<Property[]> => {
-  // TODO: Implement with Prisma
   return [];
 };
 
