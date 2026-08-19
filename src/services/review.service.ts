@@ -1,5 +1,3 @@
-// Review service - Business logic for reviews
-
 export interface Review {
   id: string;
   propertyId: string;
@@ -12,12 +10,10 @@ export interface Review {
 }
 
 export const findAllReviews = async (): Promise<Review[]> => {
-  // TODO: Implement with Prisma
   return [];
 };
 
 export const findReviewById = async (id: string): Promise<Review | null> => {
-  // TODO: Implement with Prisma
   console.log(`Finding review: ${id}`);
   return null;
 };
