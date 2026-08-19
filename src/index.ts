@@ -16,6 +16,14 @@ import { configurePassport } from '@utils/sso.login';
 
 dotenv.config();
 
+// Diagnostics: confirm the backend process is started from the expected location
+// and that DATABASE_URL is present in the loaded environment.
+// Do not leave these logs in production.
+// eslint-disable-next-line no-console
+console.log(`Backend cwd: ${process.cwd()}`);
+// eslint-disable-next-line no-console
+console.log(`DATABASE_URL loaded: ${Boolean(process.env.DATABASE_URL)}`);
+
 const app: Application = express();
 const PORT = process.env.PORT ?? 5000;
 
@@ -38,12 +46,17 @@ app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Root route for basic backend readiness
+app.get('/', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', message: 'RoomReview backend is running' });
+});
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
 
 export default app;
