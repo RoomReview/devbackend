@@ -8,7 +8,7 @@
     // "explainFiles": true,
 
     /* Paths & Outputs */
-    "rootDir": "./src",
+    "rootDir": ".",
     "outDir": "./dist",
     "sourceMap": true,
 
@@ -26,8 +26,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
-
     "paths": {
       "@/*": ["./src/*"],
       "@config/*": ["./src/config/*"],
@@ -47,6 +47,6 @@
     "diagnostics": true
 
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.*"]
+  "include": ["src/**/*", "scripts/**/*", "prisma/seeds/**/*", "eslint.config.ts", "tsdown.config.ts"],
+  "exclude": ["node_modules", "dist", "test"]
 }
