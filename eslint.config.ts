@@ -61,6 +61,7 @@ export default defineConfig(
       "@typescript-eslint/require-await": "off",
       "no-console": "off",
       "@typescript-eslint/no-explicit-any": "off", // Allow in tests for mocking
+      "@typescript-eslint/no-floating-promises": "off",
     },
   },
   {
