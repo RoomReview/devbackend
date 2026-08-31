@@ -16,6 +16,9 @@ import { configurePassport } from '@utils/sso.login';
 
 dotenv.config();
 
+// Diagnostics: confirm the backend process is started from the expected location
+// and that DATABASE_URL is present in the loaded environment.
+// Do not leave these logs in production.
 // eslint-disable-next-line no-console
 console.log(`Backend cwd: ${process.cwd()}`);
 // eslint-disable-next-line no-console
