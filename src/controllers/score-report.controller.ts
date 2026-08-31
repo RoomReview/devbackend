@@ -69,3 +69,4 @@ export const getScoreReportPdf = async (req: Request, res: Response): Promise<vo
   res.setHeader('Content-Disposition', `attachment; filename="score-report-${id}.pdf"`);
   res.status(200).send(pdfBuffer);
 };
+
