@@ -67,7 +67,7 @@ const normalizeMetric = (value: unknown, max = 100, invert = false): number => {
   return invert ? 1 - normalized : normalized;
 };
 
-const getMetricValue = (metrics: Record<string, unknown>, keys: string[]): number => {
+const getMetricValue = (metrics: Record<string, unknown>, keys: string[]): number | undefined => {
   for (const key of keys) {
     const value = metrics[key];
     if (typeof value === 'number' && !Number.isNaN(value)) {
@@ -80,30 +80,64 @@ const getMetricValue = (metrics: Record<string, unknown>, keys: string[]): numbe
       }
     }
   }
-  return 0;
+  return undefined;
 };
 
-const calculateMetricsScore = (metrics: Record<string, unknown>): { score: number; breakdown: Record<string, number> } => {
+const parseMetricNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string' || value.trim().length === 0) return undefined;
+  const parsed = Number(value.replace(/[^0-9.\-]+/g, ''));
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const withDerivedScoreMetrics = (metrics: Record<string, unknown>): Record<string, unknown> => {
+  const derived = { ...metrics };
+  const rating = parseMetricNumber(metrics.rating);
+  const averageRent = parseMetricNumber(metrics.avgRent);
+  const zone = parseMetricNumber(metrics.zones);
+
+  if (getMetricValue(derived, ['score', 'quality']) === undefined && rating !== undefined) {
+    derived.score = Math.max(0, Math.min(100, rating * 20));
+  }
+  if (getMetricValue(derived, ['affordabilityScore', 'costOfLiving', 'medianRent', 'medianPrice']) === undefined && averageRent !== undefined) {
+    derived.affordabilityScore = Math.max(0, Math.min(100, (averageRent / 4000) * 100));
+  }
+  if (getMetricValue(derived, ['transportScore', 'accessScore', 'publicTransportScore', 'commuteScore']) === undefined && zone !== undefined) {
+    derived.transportScore = Math.max(0, Math.min(10, 11 - zone));
+  }
+
+  return derived;
+};
+
+const calculateMetricsScore = (metrics: Record<string, unknown>): { score: number | null; breakdown: Record<string, number> } => {
   const breakdown: Record<string, number> = {};
   let weightedSum = 0;
   let totalWeight = 0;
 
   for (const category of scoreCategories) {
     const metricValue = getMetricValue(metrics, category.keys);
+    if (metricValue === undefined) continue;
+
     const normalized = normalizeMetric(metricValue, category.max, category.invert) * 100;
     breakdown[category.name] = Math.round(normalized);
     weightedSum += normalized * category.weight;
     totalWeight += category.weight;
   }
 
-  const baseline = normalizeMetric(metrics['score'] ?? metrics['quality'] ?? 60, 100, false) * 100;
-  const combined = totalWeight > 0 ? weightedSum / totalWeight : baseline;
-  const score = Math.round((baseline * 0.12) + (combined * 0.88));
+  const baselineMetric = getMetricValue(metrics, ['score', 'quality']);
+  if (totalWeight === 0 && baselineMetric === undefined) {
+    return { score: null, breakdown };
+  }
+
+  const baseline = baselineMetric === undefined ? null : normalizeMetric(baselineMetric, 100, false) * 100;
+  const combined = totalWeight > 0 ? weightedSum / totalWeight : baseline!;
+  const score = baseline === null ? Math.round(combined) : Math.round((baseline * 0.12) + (combined * 0.88));
 
   return { score: Math.max(0, Math.min(100, score)), breakdown };
 };
 
-const combineScores = (boroughScore: number | null, postcodeScore: number | null): number => {
+const combineScores = (boroughScore: number | null, postcodeScore: number | null): number | null => {
+  if (boroughScore === null && postcodeScore === null) return null;
   if (boroughScore !== null && postcodeScore !== null) {
     return Math.round(boroughScore * 0.55 + postcodeScore * 0.45);
   }
@@ -213,11 +247,26 @@ const buildPdfBuffer = (report: Awaited<ReturnType<typeof getScoreReportById>>):
 };
 
 const calculateMetrics = (metrics: Record<string, unknown> = {}) => {
-  const { score, breakdown } = calculateMetricsScore(metrics);
+  const { score, breakdown } = calculateMetricsScore(withDerivedScoreMetrics(metrics));
   return { score, breakdown };
 };
 
-export const _calculateMetricsScoreForTest = calculateMetricsScore;
+const calculateLocationScores = (
+  boroughMetrics: Record<string, unknown>,
+  hasPostcode: boolean,
+) => {
+  const boroughResult = calculateMetrics(boroughMetrics);
+  const postcodeResult = hasPostcode ? boroughResult : { score: null, breakdown: {} };
+
+  return {
+    boroughResult,
+    postcodeResult,
+    overallScore: combineScores(boroughResult.score, postcodeResult.score),
+  };
+};
+
+export const _calculateMetricsScoreForTest = (metrics: Record<string, unknown>) => calculateMetricsScore(withDerivedScoreMetrics(metrics));
+export const _calculateLocationScoresForTest = calculateLocationScores;
 export const _buildPdfBufferForTest = buildPdfBuffer;
 
 export const createScoreReportRequest = async (data: CreateScoreRequestDto) => {
@@ -286,14 +335,12 @@ export const calculatePostcodeScore = async (postcodeId: string) => {
 
 const generateScoreReportNow = async (id: string) => {
   const report = await getScoreReportById(id);
-  const borough = report.boroughId ? await findBoroughById(report.boroughId) : null;
   const postcode = report.postcodeId ? await findPostcodeById(report.postcodeId) : null;
+  const boroughId = report.boroughId ?? (postcode as any)?.boroughId;
+  const borough = boroughId ? await findBoroughById(boroughId) : null;
 
   const boroughMetrics = (borough ? (borough as any).metrics as Record<string, unknown> : {}) ?? {};
-  const postcodeMetrics = (postcode ? (postcode as any).metrics as Record<string, unknown> : {}) ?? {};
-
-  const boroughResult = borough ? calculateMetrics(boroughMetrics) : { score: null, breakdown: {} };
-  const postcodeResult = postcode ? calculateMetrics(postcodeMetrics) : { score: null, breakdown: {} };
+  const { boroughResult, postcodeResult, overallScore } = calculateLocationScores(boroughMetrics, Boolean(postcode));
   const scoreBreakdown = {
     borough: boroughResult.breakdown,
     postcode: postcodeResult.breakdown,
@@ -301,7 +348,6 @@ const generateScoreReportNow = async (id: string) => {
 
   const boroughScore = boroughResult.score;
   const postcodeScore = postcodeResult.score;
-  const overallScore = combineScores(boroughScore, postcodeScore);
 
   const reportData = buildReportPayload(
     report,
@@ -356,14 +402,6 @@ export const previewScoreReport = async (data: ScorePreviewDto) => {
     });
   }
 
-  const borough = data.boroughId ? await findBoroughById(data.boroughId) : null;
-  if (data.boroughId && !borough) {
-    throw new EntityNotFoundError({
-      message: `Borough with ID ${data.boroughId} not found`,
-      code: 'ENTITY_NOT_FOUND',
-    });
-  }
-
   const postcode = data.postcodeId ? await findPostcodeById(data.postcodeId) : null;
   if (data.postcodeId && !postcode) {
     throw new EntityNotFoundError({
@@ -372,9 +410,19 @@ export const previewScoreReport = async (data: ScorePreviewDto) => {
     });
   }
 
-  const boroughResult = borough ? calculateMetrics((borough as any).metrics as Record<string, unknown> ?? {}) : { score: null, breakdown: {} };
-  const postcodeResult = postcode ? calculateMetrics((postcode as any).metrics as Record<string, unknown> ?? {}) : { score: null, breakdown: {} };
-  const overallScore = combineScores(boroughResult.score, postcodeResult.score);
+  const boroughId = data.boroughId ?? (postcode as any)?.boroughId;
+  const borough = boroughId ? await findBoroughById(boroughId) : null;
+  if (boroughId && !borough) {
+    throw new EntityNotFoundError({
+      message: `Borough with ID ${boroughId} not found`,
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  const { boroughResult, postcodeResult, overallScore } = calculateLocationScores(
+    ((borough as any)?.metrics as Record<string, unknown>) ?? {},
+    Boolean(postcode),
+  );
 
   return {
     borough: (borough as any)?.name,
@@ -403,3 +451,4 @@ export const generateScoreReportPdf = async (id: string) => {
   }
   return buildPdfBuffer(report);
 };
+
