@@ -11,10 +11,7 @@ import {
   ForgotPasswordDto,
 } from '@/dto/auth.dto';
 import { validateRequest } from '@/middleware/validation.middleware';
-import {
-  requireMatchingUser,
-  authenticate,
-} from '@/middleware/auth.middleware';
+import { authenticate } from '@/middleware/auth.middleware';
 
 /**
  * @swagger
