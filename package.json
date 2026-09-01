@@ -28,9 +28,9 @@
     "docs:generate": "tsx scripts/generate-swagger.ts"
   },
   "dependencies": {
+    "@google-cloud/bigquery": "^9.0.3",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
-    "@google-cloud/bigquery": "^8.5.0",
     "@sendgrid/mail": "^8.1.6",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
