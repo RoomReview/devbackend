@@ -6,7 +6,7 @@ export const getPostcodeDataByCode = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { code } = req.params;
+  const code = String(req.params.code);
   const data = await postcodeDataService.getPostcodeDataByCode(code);
 
   const response: ApiResponse<typeof data> = {
