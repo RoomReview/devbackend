@@ -24,9 +24,11 @@
     /* Interoperability & Emit */
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "ignoreDeprecations": "5.0",
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
@@ -45,7 +47,8 @@
     "noEmit": true,
     "types": ["node"],
     "diagnostics": true
+
   },
   "include": ["src/**/*", "scripts/**/*", "prisma/seeds/**/*", "eslint.config.ts", "tsdown.config.ts"],
-  "exclude": ["node_modules", "dist", "test", "**/*.test.ts", "**/*.spec.ts"]
+  "exclude": ["node_modules", "dist", "build", "test", "src/generated", "**/*.test.ts", "**/*.spec.ts"]
 }
