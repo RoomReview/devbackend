@@ -7,9 +7,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && tsdown",
-    "build:dev": "tsc && tsdown",
-    "build:prod": "tsc && tsdown",
+    "build": "prisma generate && tsc && tsdown",
+    "build:dev": "prisma generate && tsc && tsdown",
+    "build:prod": "prisma generate && tsc && tsdown",
     "start": "node dist/index.mjs",
     "start:cjs": "node dist/index.cjs",
     "sync:bigquery": "tsx scripts/sync-bigquery.ts",
