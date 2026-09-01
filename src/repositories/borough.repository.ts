@@ -141,4 +141,3 @@ export const deleteBorough = async (
     throw new Error('DB: borough delete operation failed');
   });
 };
-
