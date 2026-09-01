@@ -5,7 +5,6 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "lib": ["es2022"],
-    // "explainFiles": true,
 
     /* Paths & Outputs */
     "rootDir": ".",
@@ -26,7 +25,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
@@ -41,11 +40,9 @@
       "@dto/*": ["src/dto/*"]
     },
 
-    // "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["node"],
     "diagnostics": true
-
   },
   "include": ["src/**/*", "scripts/**/*", "prisma/seeds/**/*", "eslint.config.ts", "tsdown.config.ts"],
   "exclude": ["node_modules", "dist", "test"]
