@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import type { ZodType } from 'zod';
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Omit<Request, 'user'> {
   user?: {
     userId: string;
     email: string;
@@ -34,6 +34,12 @@ export interface ApiResponse<T = unknown> {
   message?: string;
   error?: string;
   status?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages?: number;
+  };
 }
 
 export interface ValidateRequestMiddlewareArgs<
@@ -50,3 +56,4 @@ export interface PaginateArgs {
   page: number;
   limit: number;
 }
+
