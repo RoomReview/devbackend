@@ -28,6 +28,8 @@
     "docs:generate": "tsx scripts/generate-swagger.ts"
   },
   "dependencies": {
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
     "@google-cloud/bigquery": "^9.0.3",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
