@@ -26,7 +26,7 @@ export const getBoroughById = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const data = await boroughService.getBoroughById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -42,7 +42,7 @@ export const getBoroughBySlug = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { slug } = req.params;
+  const slug = String(req.params.slug);
   const data = await boroughService.getBoroughBySlug(slug);
 
   const response: ApiResponse<typeof data> = {
@@ -73,7 +73,7 @@ export const updateBorough = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const data = await boroughService.updateBoroughById(id, req.body as UpdateBoroughDto);
 
   const response: ApiResponse<typeof data> = {
@@ -89,7 +89,7 @@ export const deleteBorough = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   await boroughService.deleteBoroughById(id);
 
   const response: ApiResponse<null> = {
