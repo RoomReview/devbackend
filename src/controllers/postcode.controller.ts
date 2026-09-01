@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '@/types';
-import * as postcodeService from '@/services/postcode.service';
+import * as postcodeService from '../services/postcode.service';
 import type { CreatePostcodeDto, UpdatePostcodeDto } from '@/dto/postcode.dto';
 
 export const getAllPostcodes = async (
