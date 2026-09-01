@@ -14,7 +14,7 @@ export const createAgency = async (
     '$connect' | '$disconnect' | '$on' | '$use' | '$extends' | '$transaction'
   > = prisma,
 ) => {
-  return await tx.agency.create({ data }).catch((err) => {
+  return await tx.agency.create({ data }).catch((err: unknown) => {
     logContext.function = 'createAgency';
     logger.error(logContext, 'Error in createAgency repository', { error: err });
     throw new Error('DB: agency create operation failed');
@@ -28,7 +28,7 @@ export const createUserAgency = async (
     '$connect' | '$disconnect' | '$on' | '$use' | '$extends' | '$transaction'
   > = prisma,
 ) => {
-  return await tx.userAgency.create({ data }).catch((err) => {
+  return await tx.userAgency.create({ data }).catch((err: unknown) => {
     logContext.function = 'createUserAgency';
     logger.error(logContext, 'Error in createUserAgency repository', { error: err });
     throw new Error('DB: userAgency create operation failed');
@@ -36,9 +36,10 @@ export const createUserAgency = async (
 };
 
 export const findAgencyByName = async (name: string) => {
-  return await prisma.agency.findFirst({ where: { name } }).catch((err) => {
+  return await prisma.agency.findFirst({ where: { name } }).catch((err: unknown) => {
     logContext.function = 'findAgencyByName';
     logger.error(logContext, 'Error in findAgencyByName repository', { error: err });
     throw new Error('DB: findAgencyByName operation failed');
   });
 };
+
