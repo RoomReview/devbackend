@@ -14,7 +14,7 @@ export const createBorough = async (
     '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
   > = prisma,
 ) => {
-  return await tx.borough.create({ data: borough }).catch(err => {
+  return await tx.borough.create({ data: borough }).catch((err: unknown) => {
     logContext.function = 'createBorough';
     logger.error(logContext, 'Error in createBorough repository', { error: err });
     throw new Error('DB: borough create operation failed');
@@ -36,7 +36,7 @@ export const findBoroughById = async (boroughId: string, select?: BoroughSelect)
       createdAt: true,
       updatedAt: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'findBoroughById';
     logger.error(logContext, 'Error in findBoroughById repository', { error: err });
     throw new Error('DB: findBoroughById operation failed');
@@ -58,10 +58,21 @@ export const findBoroughBySlug = async (slug: string, select?: BoroughSelect) =>
       createdAt: true,
       updatedAt: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'findBoroughBySlug';
     logger.error(logContext, 'Error in findBoroughBySlug repository', { error: err });
     throw new Error('DB: findBoroughBySlug operation failed');
+  });
+};
+
+export const findBoroughByName = async (name: string) => {
+  return await prisma.borough.findUnique({
+    where: { name },
+    select: { boroughId: true, name: true, slug: true },
+  }).catch((err: unknown) => {
+    logContext.function = 'findBoroughByName';
+    logger.error(logContext, 'Error in findBoroughByName repository', { error: err, name });
+    throw new Error('DB: borough lookup by name failed');
   });
 };
 
@@ -82,7 +93,7 @@ export const findAllBoroughs = async (
       image: true,
       metrics: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'findAllBoroughs';
     logger.error(logContext, 'Error in findAllBoroughs repository', { error: err });
     throw new Error('DB: findAllBoroughs operation failed');
@@ -90,7 +101,7 @@ export const findAllBoroughs = async (
 };
 
 export const countBoroughs = async () => {
-  return await prisma.borough.count().catch(err => {
+  return await prisma.borough.count().catch((err: unknown) => {
     logContext.function = 'countBoroughs';
     logger.error(logContext, 'Error in countBoroughs repository', { error: err });
     throw new Error('DB: countBoroughs operation failed');
@@ -108,7 +119,7 @@ export const updateBorough = async (
   return await tx.borough.update({
     where: { boroughId },
     data,
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'updateBorough';
     logger.error(logContext, 'Error in updateBorough repository', { error: err });
     throw new Error('DB: borough update operation failed');
@@ -124,9 +135,10 @@ export const deleteBorough = async (
 ) => {
   return await tx.borough.delete({
     where: { boroughId },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'deleteBorough';
     logger.error(logContext, 'Error in deleteBorough repository', { error: err });
     throw new Error('DB: borough delete operation failed');
   });
 };
+
