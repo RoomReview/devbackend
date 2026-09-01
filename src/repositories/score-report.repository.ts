@@ -15,7 +15,7 @@ export const createScoreReport = async (
   scoreReport: ScoreReportCreateInput,
   tx = prisma,
 ) => {
-  return await tx.scoreReport.create({ data: scoreReport }).catch((err) => {
+  return await tx.scoreReport.create({ data: scoreReport }).catch((err: unknown) => {
     logContext.function = 'createScoreReport';
     logger.error(logContext, 'Error in createScoreReport repository', { error: err });
     throw new Error('DB: score report create operation failed');
@@ -44,7 +44,7 @@ export const findScoreReportById = async (
       createdAt: true,
       updatedAt: true,
     },
-  }).catch((err) => {
+  }).catch((err: unknown) => {
     logContext.function = 'findScoreReportById';
     logger.error(logContext, 'Error in findScoreReportById repository', { error: err });
     throw new Error('DB: find score report operation failed');
@@ -59,7 +59,7 @@ export const updateScoreReport = async (
   return await tx.scoreReport.update({
     where: { scoreReportId },
     data,
-  }).catch((err) => {
+  }).catch((err: unknown) => {
     logContext.function = 'updateScoreReport';
     logger.error(logContext, 'Error in updateScoreReport repository', { error: err });
     throw new Error('DB: score report update operation failed');
@@ -72,9 +72,10 @@ export const deleteScoreReport = async (
 ) => {
   return await tx.scoreReport.delete({
     where: { scoreReportId },
-  }).catch((err) => {
+  }).catch((err: unknown) => {
     logContext.function = 'deleteScoreReport';
     logger.error(logContext, 'Error in deleteScoreReport repository', { error: err });
     throw new Error('DB: score report delete operation failed');
   });
 };
+
