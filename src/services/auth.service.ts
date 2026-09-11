@@ -367,6 +367,14 @@ export interface SsoProfile {
   lastName: string;
 }
 
+/**
+ * Logs in an existing user or registers a new one via an SSO provider.
+ * Lookup order:
+ *   1. Find by provider-specific ID (googleId / facebookId)
+ *   2. Auto-link: find by email and attach SSO identity
+ *   3. Create brand-new SSO-only user
+ * In all cases a JWT session is upserted and returned.
+ */
 export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
   logContext.function = 'loginOrRegisterSsoUser';
   const { provider, id, email, firstName, lastName } = profile;
