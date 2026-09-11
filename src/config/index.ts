@@ -45,6 +45,16 @@ export const config = {
   facebookAppSecret: process.env.FACEBOOK_APP_SECRET ?? '',
   facebookCallbackUrl: process.env.FACEBOOK_CALLBACK_URL ?? 'http://localhost:5000/api/v1/sso/facebook/callback',
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+  stripeReportPriceId: process.env.STRIPE_REPORT_PRICE_ID ?? '',
+  stripeSubscriptionPriceId: process.env.STRIPE_SUBSCRIPTION_PRICE_ID ?? '',
+  stripeSubscriptionCredits: Number(process.env.STRIPE_SUBSCRIPTION_CREDITS ?? 10),
+  stripeSubscriptionAmount: Number(process.env.STRIPE_SUBSCRIPTION_AMOUNT ?? 3500),
+  stripeReportAmount: Number(process.env.STRIPE_REPORT_AMOUNT ?? 1999),
+  stripeCurrency: process.env.STRIPE_CURRENCY ?? 'gbp',
+  stripeSuccessUrl: process.env.STRIPE_SUCCESS_URL ?? `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+  stripeCancelUrl: process.env.STRIPE_CANCEL_URL ?? `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/checkout/cancel`,
 } as const;
 
 export default config;
