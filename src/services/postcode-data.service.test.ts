@@ -7,7 +7,7 @@ import {
   buildHousingStockData,
   buildPropertyValueData,
   buildRentData,
-} from '@/services/postcode-data.service';
+} from '../services/postcode-data.service';
 
 describe('postcode-data.service mapping helpers', () => {
   it('builds rent data from quarterly rent rows', () => {
@@ -101,4 +101,3 @@ describe('postcode-data.service mapping helpers', () => {
     });
   });
 });
-
