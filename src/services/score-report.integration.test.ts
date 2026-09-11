@@ -1,10 +1,10 @@
 import assert from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import request from 'supertest';
-import app from '@/index';
-import prisma from '@/config/database';
-import { generateAccessToken } from '@/utils/jwt.token';
-import { UserRole } from '@/generated/prisma/enums';
+import app from '../index';
+import prisma from '../config/database';
+import { generateAccessToken } from '../utils/jwt.token';
+import { UserRole } from '../generated/prisma/enums';
 
 describe('Score report integration', () => {
   let adminToken: string;
