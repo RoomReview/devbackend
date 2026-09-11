@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import type { ApiResponse } from '@/types';
 import * as scoreReportService from '@/services/score-report.service';
 import type { CreateScoreRequestDto, ScorePreviewDto } from '@/dto/score.dto';
+import type { AuthenticatedRequest } from '@/types';
+import * as paymentService from '@/services/payment.service';
 
 const getSingleParamValue = (value: string | string[] | undefined): string => {
   if (typeof value === 'string') {
@@ -11,8 +13,8 @@ const getSingleParamValue = (value: string | string[] | undefined): string => {
   return value?.[0] ?? '';
 };
 
-export const createScoreReport = async (req: Request, res: Response): Promise<void> => {
-  const data = await scoreReportService.createScoreReportRequest(req.body as CreateScoreRequestDto);
+export const createScoreReport = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const data = await scoreReportService.createScoreReportRequest(req.body as CreateScoreRequestDto, req.user!.userId);
 
   const response: ApiResponse<typeof data> = {
     success: true,
@@ -23,8 +25,9 @@ export const createScoreReport = async (req: Request, res: Response): Promise<vo
   res.status(201).json(response);
 };
 
-export const getScoreReport = async (req: Request, res: Response): Promise<void> => {
+export const getScoreReport = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const id = getSingleParamValue(req.params.id);
+  await paymentService.assertReportOwner(id, req.user!.userId);
   const data = await scoreReportService.getScoreReportById(id);
 
   const response: ApiResponse<typeof data> = {
@@ -36,8 +39,9 @@ export const getScoreReport = async (req: Request, res: Response): Promise<void>
   res.status(200).json(response);
 };
 
-export const enqueueScoreReportGeneration = async (req: Request, res: Response): Promise<void> => {
+export const enqueueScoreReportGeneration = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const id = getSingleParamValue(req.params.id);
+  await paymentService.assertPaidReportAccess(id, req.user!.userId);
   const data = await scoreReportService.enqueueScoreReportGeneration(id);
 
   const response: ApiResponse<typeof data> = {
@@ -61,12 +65,12 @@ export const previewScoreReport = async (req: Request, res: Response): Promise<v
   res.status(200).json(response);
 };
 
-export const getScoreReportPdf = async (req: Request, res: Response): Promise<void> => {
+export const getScoreReportPdf = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const id = getSingleParamValue(req.params.id);
+  await paymentService.assertPaidReportAccess(id, req.user!.userId);
   const pdfBuffer = await scoreReportService.generateScoreReportPdf(id);
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="score-report-${id}.pdf"`);
   res.status(200).send(pdfBuffer);
 };
-
