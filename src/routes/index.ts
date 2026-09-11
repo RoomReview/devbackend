@@ -27,6 +27,8 @@ import crimeDataRoutes from './crime-data.routes';
 import votingDataRoutes from './voting-data.routes';
 import postcodeDataRoutes from './postcode-data.routes';
 import scoreReportRoutes from './score-report.routes';
+import analyticsRoutes from './analytics.routes.js';
+import paymentRoutes from './payment.routes';
 import { errorHandler, notFoundHandler } from '@middleware/error.middleware';
 
 const router = Router();
@@ -59,6 +61,8 @@ router.use('/data/crime', crimeDataRoutes);
 router.use('/data/voting', votingDataRoutes);
 router.use('/data/postcode', postcodeDataRoutes);
 router.use('/score-reports', scoreReportRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/analytics', analyticsRoutes);
 router.use(notFoundHandler);
 router.use(errorHandler);
 
