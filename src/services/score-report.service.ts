@@ -2,6 +2,8 @@ import {
   createScoreReport,
   findScoreReportById,
   updateScoreReport,
+  assignScoreReportOwner,
+  findScoreReportOwner,
 } from '@/repositories/score-report.repository';
 import { findBoroughById } from '@/repositories/borough.repository';
 import { findPostcodeById } from '@/repositories/postcode.repository';
@@ -269,7 +271,7 @@ export const _calculateMetricsScoreForTest = (metrics: Record<string, unknown>) 
 export const _calculateLocationScoresForTest = calculateLocationScores;
 export const _buildPdfBufferForTest = buildPdfBuffer;
 
-export const createScoreReportRequest = async (data: CreateScoreRequestDto) => {
+export const createScoreReportRequest = async (data: CreateScoreRequestDto, userId: string) => {
   if (!data.boroughId && !data.postcodeId) {
     throw new ValidationError({
       message: 'Either boroughId or postcodeId must be provided',
@@ -293,14 +295,18 @@ export const createScoreReportRequest = async (data: CreateScoreRequestDto) => {
     });
   }
 
-  return await createScoreReport({
+  const report = await createScoreReport({
     borough: data.boroughId ? { connect: { boroughId: data.boroughId } } : undefined,
     postcode: data.postcodeId ? { connect: { postcodeId: data.postcodeId } } : undefined,
     name: data.name,
     description: data.description,
     status: ScoreStatus.WAITING,
   });
+  await assignScoreReportOwner(report.scoreReportId, userId);
+  return report;
 };
+
+export const getScoreReportOwner = (id: string) => findScoreReportOwner(id);
 
 export const getScoreReportById = async (id: string) => {
   const report = await findScoreReportById(id);
@@ -451,4 +457,3 @@ export const generateScoreReportPdf = async (id: string) => {
   }
   return buildPdfBuffer(report);
 };
-
