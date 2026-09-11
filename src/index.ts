@@ -13,6 +13,7 @@ import { assignRequestId } from '@middleware/request-id.middleware.js';
 import { getCustomMorganFormat } from '@middleware/request-logger.middleware';
 import routes from './routes';
 import { configurePassport } from '@utils/sso.login';
+import * as paymentController from './controllers/payment.controller';
 
 dotenv.config();
 
@@ -32,6 +33,8 @@ app.use(assignRequestId());
 app.use(helmet());
 app.use(cors());
 app.use(morgan(getCustomMorganFormat));
+app.get('/api/v1/payments/webhook', paymentController.webhookStatus);
+app.post('/api/v1/payments/webhook', express.raw({ type: 'application/json' }), paymentController.handleWebhook);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
