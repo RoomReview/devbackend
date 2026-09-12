@@ -40,7 +40,7 @@
       "@services/*": ["./src/services/*"],
       "@utils/*": ["./src/utils/*"],
       "@types/*": ["./src/types/*"],
-      "@dto/*": ["src/dto/*"]
+      "@dto/*": ["./src/dto/*"]
     },
 
     // "allowImportingTsExtensions": true,
