@@ -11,8 +11,8 @@ The project is `"type": "module"`. Never generate `require()`, `module.exports`,
 
 In test files, import using the `.ts` extension explicitly — `tsx` resolves them directly:
 ```ts
-import { myFn } from './my-service.ts'; // ✅
-import { myFn } from './my-service';    // ❌ will break under tsx test runner
+import { myFn } from './my-service.ts'; // 
+import { myFn } from './my-service';    // will break under tsx test runner
 ```
 
 ---
@@ -41,13 +41,13 @@ Use the aliases defined in `tsconfig.json`. Never write `../../` chains when an 
 Express 5 auto-catches rejected async promises and forwards them to the error handler. Do **not** wrap controller logic in `try/catch` unless you need to log before re-throwing.
 
 ```ts
-// ✅ Correct — Express 5 handles the rejection
+// Correct — Express 5 handles the rejection
 export const getUser = async (req: Request, res: Response): Promise<void> => {
   const data = await userService.getById(req.params.id);
   res.status(200).json({ success: true, statusCode: 200, data });
 };
 
-// ❌ Wrong — swallows errors and bypasses ApiResponse + errorHandler
+// Wrong — swallows errors and bypasses ApiResponse + errorHandler
 export const getUser = async (req: Request, res: Response): Promise<void> => {
   try { ... } catch { res.status(500).json({ error: 'Internal server error' }); }
 };
@@ -90,10 +90,10 @@ Constructor: `{ message: string, code: ErrorCode, data?: unknown }`
 The project uses **Zod v4**. Never use the `z` default import.
 
 ```ts
-// ✅ Zod v4
+// Zod v4
 import { object, string, email, regexes, enum as enum_, type infer as _infer } from 'zod';
 
-// ❌ Zod v3 style — wrong
+// Zod v3 style — wrong
 import { z } from 'zod';
 ```
 
