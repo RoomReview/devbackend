@@ -13,25 +13,26 @@ import { assignRequestId } from '@middleware/request-id.middleware.js';
 import { getCustomMorganFormat } from '@middleware/request-logger.middleware';
 import routes from './routes';
 import { configurePassport } from '@utils/sso.login';
+import logger from '@utils/logger';
+import * as paymentController from './controllers/payment.controller';
+import { startScoreReportWorker } from '@/services/score-report.service';
 
 dotenv.config();
 
-// Diagnostics: confirm the backend process is started from the expected location
-// and that DATABASE_URL is present in the loaded environment.
-// Do not leave these logs in production.
-// eslint-disable-next-line no-console
-console.log(`Backend cwd: ${process.cwd()}`);
-// eslint-disable-next-line no-console
-console.log(`DATABASE_URL loaded: ${Boolean(process.env.DATABASE_URL)}`);
-
 const app: Application = express();
 const PORT = process.env.PORT ?? 5000;
+const isTestProcess = process.env.NODE_ENV === 'test'
+  || process.env.NODE_TEST_CONTEXT !== undefined
+  || process.argv.includes('--test');
+if (!isTestProcess) void startScoreReportWorker();
 
 // Middleware
 app.use(assignRequestId());
 app.use(helmet());
 app.use(cors());
 app.use(morgan(getCustomMorganFormat));
+app.get('/api/v1/payments/webhook', paymentController.webhookStatus);
+app.post('/api/v1/payments/webhook', express.raw({ type: 'application/json' }), paymentController.handleWebhook);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -55,8 +56,13 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+if (!isTestProcess) {
+  app.listen(PORT, () => {
+    logger.info(
+      { service: 'HTTP', function: 'listen' },
+      `Server running on port ${PORT}`,
+    );
+  });
+}
 
 export default app;
