@@ -78,7 +78,7 @@ switch (command) {
   }
 
   default:
-    console.error(`\n❌  Unknown command: "${command}"\n`);
+    console.error(`\nUnknown command: "${command}"\n`);
     printHelp();
     process.exit(1);
 }
@@ -90,9 +90,9 @@ switch (command) {
  * Run this after any schema change before using the client in app code.
  */
 async function runGenerate() {
-  console.log('⚙️  Generating Prisma Client from schema...');
+  console.log('Generating Prisma Client from schema...');
   shell('npx prisma generate');
-  console.log('✅  Prisma Client generated.');
+  console.log('Prisma Client generated.');
 }
 
 /**
@@ -108,11 +108,11 @@ async function runGenerate() {
  */
 async function runInit(name) {
   const migrationName = name || 'init';
-  console.log(`📦  Creating migration: "${migrationName}"...`);
-  shell(`npx prisma migrate dev --name ${migrationName}`);
-  console.log(`✅  Migration "${migrationName}" created and applied.`);
+  console.log(`Creating migration: "${migrationName}"...`);
+  shell(`npx prisma migrate dev --create-only --name ${migrationName}`);
+  console.log(`Migration "${migrationName}" created and applied.`);
   console.log(
-    `\n📝  Tip: author a down.sql in the new migration folder to enable rollback.\n`,
+    `\nTip: author a down.sql in the new migration folder to enable rollback.\n`,
   );
 }
 
@@ -122,9 +122,9 @@ async function runInit(name) {
  * It never prompts, never generates new migrations, never resets the DB.
  */
 async function runRollforward() {
-  console.log('🚀  Deploying pending migrations...');
+  console.log('Deploying pending migrations...');
   shell('npx prisma migrate deploy');
-  console.log('✅  All pending migrations applied.');
+  console.log('All pending migrations applied.');
 }
 
 /**
@@ -143,9 +143,16 @@ async function runRollforward() {
  * @param {{ targetMigration: string|null, listFlag: boolean }} opts
  */
 async function runRollback({ targetMigration, listFlag }) {
+  if (!listFlag && process.env.ALLOW_DESTRUCTIVE_ROLLBACK !== 'true') {
+    console.error(
+      'Destructive rollback is disabled. Set ALLOW_DESTRUCTIVE_ROLLBACK=true only during an approved staging rehearsal or incident procedure.',
+    );
+    process.exit(1);
+  }
+
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.error('❌  DATABASE_URL is not set. Cannot connect to the database.');
+    console.error('DATABASE_URL is not set. Cannot connect to the database.');
     process.exit(1);
   }
 
@@ -153,7 +160,7 @@ async function runRollback({ targetMigration, listFlag }) {
   try {
     pg = (await import('pg')).default;
   } catch {
-    console.error('❌  The "pg" package is not available. Run: npm install pg');
+    console.error('The "pg" package is not available. Run: npm install pg');
     process.exit(1);
   }
 
@@ -172,13 +179,13 @@ async function runRollback({ targetMigration, listFlag }) {
     );
 
     if (applied.length === 0) {
-      console.log('ℹ️   No applied migrations found — nothing to roll back.');
+      console.log('No applied migrations found — nothing to roll back.');
       return;
     }
 
     // ── --list mode ─────────────────────────────────────────────────────────
     if (listFlag) {
-      console.log('\n📋  Applied migrations (newest → oldest):\n');
+      console.log('\nApplied migrations (newest → oldest):\n');
       applied.forEach(({ migration_name, finished_at }, i) => {
         const marker = i === 0 ? ' ← latest' : '';
         console.log(`  ${String(i + 1).padStart(2, '0')}  ${migration_name}  (${finished_at.toISOString()})${marker}`);
@@ -194,37 +201,37 @@ async function runRollback({ targetMigration, listFlag }) {
       // Validate the target exists in history
       const targetIdx = applied.findIndex((r) => r.migration_name === targetMigration);
       if (targetIdx === -1) {
-        console.error(`\n❌  Migration not found in applied history: "${targetMigration}"`);
-        console.error('    Run with --list to see available migration names.\n');
+        console.error(`\nMigration not found in applied history: "${targetMigration}"`);
+        console.error('Run with --list to see available migration names.\n');
         process.exit(1);
       }
       // Roll back everything NEWER than the target (target itself is kept)
       // applied is newest-first, so slice up to (but not including) targetIdx
       toRollback = applied.slice(0, targetIdx);
       if (toRollback.length === 0) {
-        console.log(`ℹ️   "${targetMigration}" is already the latest migration — nothing to roll back.`);
+        console.log(`ℹ"${targetMigration}" is already the latest migration — nothing to roll back.`);
         return;
       }
-      console.log(`\n🎯  Rolling back to: ${targetMigration}`);
-      console.log(`    Migrations to revert (${toRollback.length}): ${toRollback.map((r) => r.migration_name).join(', ')}\n`);
+      console.log(`\nRolling back to: ${targetMigration}`);
+      console.log(`Migrations to revert (${toRollback.length}): ${toRollback.map((r) => r.migration_name).join(', ')}\n`);
     } else {
       // Default: only the last one
       toRollback = [applied[0]];
-      console.log(`\n🔍  Rolling back last migration: ${applied[0].migration_name}\n`);
+      console.log(`\nRolling back last migration: ${applied[0].migration_name}\n`);
     }
 
     // ── Verify all required down.sql files exist before touching the DB ─────
     for (const { migration_name } of toRollback) {
       const downSqlPath = join(MIGRATIONS_DIR, migration_name, 'down.sql');
       if (!existsSync(downSqlPath)) {
-        console.error(`❌  Missing down.sql for: ${migration_name}`);
-        console.error(`    Expected at: ${downSqlPath}`);
-        console.error('    No changes were made. Author the missing file(s) and retry.\n');
+        console.error(`Missing down.sql for: ${migration_name}`);
+        console.error(`Expected at: ${downSqlPath}`);
+        console.error('No changes were made. Author the missing file(s) and retry.\n');
         process.exit(1);
       }
       const content = readFileSync(downSqlPath, 'utf-8').trim();
       if (!content) {
-        console.error(`❌  down.sql is empty for: ${migration_name} — ${downSqlPath}\n`);
+        console.error(`down.sql is empty for: ${migration_name} — ${downSqlPath}\n`);
         process.exit(1);
       }
     }
@@ -238,21 +245,21 @@ async function runRollback({ targetMigration, listFlag }) {
         'utf-8',
       ).trim();
 
-      console.log(`⏪  Reverting: ${migration_name}`);
+      console.log(`Reverting: ${migration_name}`);
       await client.query(downSql);
       await client.query(
         `DELETE FROM _prisma_migrations WHERE migration_name = $1`,
         [migration_name],
       );
-      console.log(`    ✓ done`);
+      console.log(`done`);
     }
 
     await client.query('COMMIT');
 
-    console.log(`\n✅  Rolled back ${toRollback.length} migration(s).\n`);
+    console.log(`\nRolled back ${toRollback.length} migration(s).\n`);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error(`\n❌  Rollback failed (all changes reverted):\n    ${err.message}\n`);
+    console.error(`\nRollback failed (all changes reverted):\n    ${err.message}\n`);
     process.exit(1);
   } finally {
     client.release();
