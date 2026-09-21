@@ -8,7 +8,7 @@
     // "explainFiles": true,
 
     /* Paths & Outputs */
-    "rootDir": "./src",
+    "rootDir": ".",
     "outDir": "./dist",
     "sourceMap": true,
 
@@ -24,10 +24,10 @@
     /* Interoperability & Emit */
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "baseUrl": ".",
-
     "paths": {
       "@/*": ["./src/*"],
       "@config/*": ["./src/config/*"],
@@ -38,7 +38,7 @@
       "@services/*": ["./src/services/*"],
       "@utils/*": ["./src/utils/*"],
       "@types/*": ["./src/types/*"],
-      "@dto/*": ["src/dto/*"]
+      "@dto/*": ["./src/dto/*"]
     },
 
     // "allowImportingTsExtensions": true,
@@ -47,6 +47,6 @@
     "diagnostics": true
 
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.*"]
+  "include": ["src/**/*", "scripts/**/*", "prisma/seeds/**/*", "eslint.config.ts", "tsdown.config.ts"],
+  "exclude": ["node_modules", "dist", "build", "test", "src/generated", "**/*.test.ts", "**/*.spec.ts"]
 }
