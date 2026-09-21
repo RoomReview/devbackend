@@ -27,3 +27,21 @@ export const paginate = (
   const offset = (page - 1) * limit;
   return { offset, limit };
 };
+
+export const buildPaginatedResult = <T>(
+  data: T[],
+  total: number,
+  page: number,
+  limit: number,
+) => {
+  const totalPages = Math.ceil(total / limit);
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+  };
+};
