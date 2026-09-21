@@ -7,8 +7,14 @@ const logContext: LogContext = {
   function: '',
 };
 
-export const createUser = async (user: UserCreateInput) => {
-  return await prisma.user.create({ data: user }).catch(err => {
+export const createUser = async (
+  user: UserCreateInput,
+  tx: Omit<
+    typeof prisma,
+    '$connect' | '$disconnect' | '$on' | '$use' | '$extends' | '$transaction'
+  > = prisma,
+) => {
+  return await tx.user.create({ data: user }).catch((err: unknown) => {
     logContext.function = 'createUser';
     logger.error(logContext, 'Error in createUser repository', { error: err });
     throw new Error('DB: user create operation failed');
@@ -16,10 +22,14 @@ export const createUser = async (user: UserCreateInput) => {
 };
 
 export const findUserByEmail = async (email: string, select?: UserSelect) => {
-  return await prisma.user.findUnique({ where: { email }, select }).catch(err => {
+  return await prisma.user.findUnique({ where: { email }, select }).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error('Prisma raw error in findUserByEmail:', err);
     logContext.function = 'findUserByEmail';
     logger.error(logContext, 'Error in findUserByEmail repository', { error: err });
-    throw new Error('DB: findUserByEmail operation failed');
+    // Include underlying error message to aid debugging in development
+    const errorMessage = err instanceof Error ? err.message : 'unknown error';
+    throw new Error(`DB: findUserByEmail operation failed: ${errorMessage}`);
   });
 };
 
@@ -36,7 +46,7 @@ export const findUserByVerifyCodeHash = async (
       verifyCodeHash: true,
       verifyCodeExpiry: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'findUserByVerifyCodeHash';
     logger.error(logContext, 'Error in findUserByVerifyCodeHash repository', { error: err });
     throw new Error('DB: findUserByVerifyCodeHash operation failed');
@@ -52,7 +62,7 @@ export const updateUserVerifyCode = async (
     where: { email },
     data: { verifyCodeHash, verifyCodeExpiry },
     select: { userId: true, email: true, isEmailVerified: true },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'updateUserVerifyCode';
     logger.error(logContext, 'Error in updateUserVerifyCode repository', { error: err });
     throw new Error('DB: updateUserVerifyCode operation failed');
@@ -77,7 +87,7 @@ export const verifyUserEmail = async (email: string) => {
       verifiedAt: true,
       role: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'verifyUserEmail';
     logger.error(logContext, 'Error in verifyUserEmail repository', { error: err });
     throw new Error('DB: verifyUserEmail operation failed');
@@ -98,7 +108,7 @@ export const findAllUsers = async (limit: number, offset: number) => {
       role: true,
       createdAt: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'findAllUsers';
     logger.error(logContext, 'Error in findAllUsers repository', { error: err });
     throw new Error('DB: findAllUsers operation failed');
@@ -106,7 +116,7 @@ export const findAllUsers = async (limit: number, offset: number) => {
 };
 
 export const findUserById = async (userId: string, select?: UserSelect) => {
-  return await prisma.user.findUnique({ where: { userId }, select }).catch(err => {
+  return await prisma.user.findUnique({ where: { userId }, select }).catch((err: unknown) => {
     logContext.function = 'findUserById';
     logger.error(logContext, 'Error in findUserById repository', { error: err });
     throw new Error('DB: findUserById operation failed');
@@ -120,7 +130,7 @@ export const updateUserPassword = async (
   return await prisma.user.update({
     where: { userId },
     data: { passwordHash },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'updateUserPassword';
     logger.error(logContext, 'Error in updateUserPassword repository', { error: err });
     throw new Error('DB: updateUserPassword operation failed');
@@ -138,7 +148,7 @@ export const updateUserPasswordAndClearCode = async (
       verifyCodeHash: null,
       verifyCodeExpiry: null,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'updateUserPasswordAndClearCode';
     logger.error(logContext, 'Error in updateUserPasswordAndClearCode repository', { error: err });
     throw new Error('DB: updateUserPasswordAndClearCode operation failed');
@@ -159,7 +169,7 @@ export const findUserByGoogleId = async (googleId: string) => {
       googleId: true,
       facebookId: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'findUserByGoogleId';
     logger.error(logContext, 'Error in findUserByGoogleId repository', { error: err });
     throw new Error('DB: findUserByGoogleId operation failed');
@@ -180,7 +190,7 @@ export const findUserByFacebookId = async (facebookId: string) => {
       googleId: true,
       facebookId: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'findUserByFacebookId';
     logger.error(logContext, 'Error in findUserByFacebookId repository', { error: err });
     throw new Error('DB: findUserByFacebookId operation failed');
@@ -227,10 +237,9 @@ export const upsertSsoUser = async (data: SsoUpsertInput) => {
       googleId: true,
       facebookId: true,
     },
-  }).catch(err => {
+  }).catch((err: unknown) => {
     logContext.function = 'upsertSsoUser';
     logger.error(logContext, 'Error in upsertSsoUser repository', { error: err });
     throw new Error('DB: upsertSsoUser operation failed');
   });
 };
-
