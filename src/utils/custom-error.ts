@@ -3,6 +3,8 @@ const ErrorCodes = {
   INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
   ROUTE_NOT_FOUND: 'ROUTE_NOT_FOUND',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
 } as const;
 
 type ErrorCode = keyof typeof ErrorCodes;
@@ -45,9 +47,49 @@ class ValidationError extends CustomError<ErrorCode> {
 }
 class UnauthorizedError extends CustomError<ErrorCode> {
   statusCode: number = 401;
+
+  constructor({
+    message,
+    statusCode,
+    code,
+    data,
+  }: {
+    message: string;
+    statusCode?: number;
+    code?: ErrorCode;
+    data?: unknown;
+  }) {
+    super({
+      message,
+      statusCode,
+      code: code ?? 'UNAUTHORIZED',
+      data,
+    });
+    this.statusCode = statusCode ?? 401;
+  }
 }
 class ForbiddenError extends CustomError<ErrorCode> {
   statusCode: number = 403;
+
+  constructor({
+    message,
+    statusCode,
+    code,
+    data,
+  }: {
+    message: string;
+    statusCode?: number;
+    code?: ErrorCode;
+    data?: unknown;
+  }) {
+    super({
+      message,
+      statusCode,
+      code: code ?? 'FORBIDDEN',
+      data,
+    });
+    this.statusCode = statusCode ?? 403;
+  }
 }
 
 export {
