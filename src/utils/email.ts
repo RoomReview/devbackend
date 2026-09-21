@@ -10,15 +10,28 @@ const logContext: LogContext = {
 const sendEmail = async (data: MailDataRequired) => {
     logContext.function = 'sendEmail';
     if (!config.sendGridApiKey) {
-        logger.error(logContext, 'SendGrid API key is not defined', {});
-        throw new Error('SendGrid API key is not defined');
+        const message = 'SendGrid API key is not defined';
+        logger.error(logContext, message, {});
+        throw new Error(message);
     }
+
+    if (!config.emailFrom) {
+        const message = 'Email sender address is not configured';
+        logger.error(logContext, message, {});
+        throw new Error(message);
+    }
+
     sgMail.setApiKey(config.sendGridApiKey);
-    logger.debug(logContext, 'Sending email', { data });
-    await sgMail.send(data).catch((error) => {
-        logger.error(logContext, 'Failed to send email', JSON.stringify(error, null, 2));
-        throw new Error('Failed to send email');
-    });
+    logger.info(logContext, 'Sending email', { to: data.personalizations?.[0]?.to, templateId: data.templateId });
+
+    try {
+        await sgMail.send(data);
+        logger.info(logContext, 'Email sent successfully', { to: data.personalizations?.[0]?.to, templateId: data.templateId });
+    } catch (error) {
+        const message = 'Failed to send email';
+        logger.error(logContext, message, { error });
+        throw new Error(message);
+    }
 };
 
 
