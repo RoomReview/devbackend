@@ -1,0 +1,2 @@
+ALTER TABLE "payment_webhook_events"
+  ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'PROCESSING';
