@@ -10,10 +10,11 @@ const __dirname = path.dirname(__filename);
 const seedsPath = path.join(__dirname, "../prisma/seeds");
 
 async function runSeed(args: string[]): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-        const seedProcess = spawn("npx", ["prisma", "db", "seed", "--", ...args], {
+    return new Promise((resolve, reject) => {
+        const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+        const seedProcess = spawn(npxCommand, ["prisma", "db", "seed", "--", ...args], {
             stdio: "inherit",
-            shell: true,
+            shell: false,
         });
 
         seedProcess.on("close", (code) => {
@@ -33,7 +34,7 @@ async function runSeed(args: string[]): Promise<void> {
 async function main() {
     const files = await fs.readdir(seedsPath);
     const availableSeeds = files
-        .filter((f) => f.endsWith(".ts") && f !== "index.ts")
+        .filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts") && f !== "index.ts")
         .map((f) => f.replace(".ts", ""));
 
     const options = {
@@ -78,7 +79,7 @@ async function main() {
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean);
-        console.log('selections', selections)
+
         for (const sel of selections) {
             const index = parseInt(sel, 10);
             if (index === 0) {
@@ -104,10 +105,8 @@ async function main() {
     if (values.environment) {
         forwardedArgs.push("--environment", values.environment as string);
     }
-    const seedFiles = [];
+    const seedFiles: string[] = [];
     for (const seedFileName of seedsToRun) {
-        console.log('sendFileName', seedFileName);
-        console.log('availabelSeeds', availableSeeds);
         if (!availableSeeds.includes(seedFileName)) {
             console.error(
                 `Error: Seed "${seedFileName}" not found. Available seeds: ${availableSeeds.join(", ")}`
@@ -115,9 +114,13 @@ async function main() {
             process.exit(1);
         }
         const seedPath = path.join(__dirname, "../prisma/seeds", `${seedFileName}.ts`);
-        seedFiles.push(seedPath)
+        seedFiles.push(seedPath);
     }
-    forwardedArgs.push("--seed", seedFiles.join(',') as string);
+
+    for (const seedPath of seedFiles) {
+        forwardedArgs.push("--seed", seedPath);
+    }
+
     await runSeed(forwardedArgs);
 
     // for (const seedName of seedsToRun) {
