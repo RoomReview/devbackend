@@ -42,11 +42,11 @@ describe('logger', () => {
       }
 
       ok(spy.calls.length > 0, 'expected console.log to be called');
-      const formatted = spy.calls[0]!.args[0] as string;
-      ok(formatted.includes('[TestService]'), 'should include service name');
-      ok(formatted.includes('[testFn]'), 'should include function name');
-      ok(formatted.includes('[INFO]'), 'should include log level');
-      ok(formatted.includes('hello from info'), 'should include message');
+      const formatted = JSON.parse(spy.calls[0]!.args[0] as string) as Record<string, unknown>;
+      equal(formatted.service, 'TestService');
+      equal(formatted.function, 'testFn');
+      equal(formatted.level, 'INFO');
+      equal(formatted.message, 'hello from info');
     });
 
     it('logger.warn should include [WARN] in output', () => {
@@ -57,7 +57,8 @@ describe('logger', () => {
         spy.restore();
       }
       ok(spy.calls.length > 0, 'expected console.warn to be called');
-      ok((spy.calls[0]!.args[0] as string).includes('[WARN]'));
+      const formatted = JSON.parse(spy.calls[0]!.args[0] as string) as Record<string, unknown>;
+      equal(formatted.level, 'WARN');
     });
 
     it('logger.error should include [ERROR] in output', () => {
@@ -68,7 +69,8 @@ describe('logger', () => {
         spy.restore();
       }
       ok(spy.calls.length > 0, 'expected console.error to be called');
-      ok((spy.calls[0]!.args[0] as string).includes('[ERROR]'));
+      const formatted = JSON.parse(spy.calls[0]!.args[0] as string) as Record<string, unknown>;
+      equal(formatted.level, 'ERROR');
     });
 
     it('formatted string should contain an ISO timestamp', () => {
