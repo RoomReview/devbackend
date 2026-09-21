@@ -1,5 +1,6 @@
 import type { ApiResponse } from '@/types/index';
 import { CustomError, RouteNotFoundError } from '@utils/custom-error';
+import logger from '@utils/logger';
 import type { Request, Response, NextFunction } from 'express';
 
 export interface AppError extends Error {
@@ -11,7 +12,7 @@ export interface AppError extends Error {
 
 export const errorHandler = (
   err: AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void => {
@@ -19,6 +20,18 @@ export const errorHandler = (
     next(err);
     return;
   }
+
+  logger.error(
+    { service: 'HTTP', function: 'errorHandler' },
+    `${err.statusCode ?? 500} ${err.message}`,
+    {
+      requestId: (req as Request & { id?: string }).id ?? '-',
+      method: req.method,
+      url: req.originalUrl,
+      code: err.code,
+      error: err,
+    },
+  );
 
   const responseObj: ApiResponse = {
     success: false,
