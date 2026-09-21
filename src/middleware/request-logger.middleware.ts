@@ -14,5 +14,8 @@ export const getCustomMorganFormat = (tokens: any, req: any, res: any) => {
     userAgent: tokens['user-agent']?.(req, res) ?? '-',
   };
 
-  return `${logParts.requestId} [${logParts.timestamp}] ${logParts.remoteAddr} - ${logParts.remoteUser} "${logParts.referrer}" "${logParts.userAgent}" "${logParts.method} ${logParts.url} HTTP/${logParts.httpVersion}" ${logParts.statusCode} ${logParts.responseTime} ${logParts.contentLength} bytes`;
+  return JSON.stringify({
+    type: 'http_request',
+    ...logParts,
+  });
 };
