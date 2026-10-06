@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as authController from '@controllers/auth.controller';
 import {
   RegisterUserDto,
+  EarlyAccessRegisterDto,
   LoginUserDto,
   LogoutUserDto,
   VerifyEmailDto,
@@ -11,6 +12,7 @@ import {
   ForgotPasswordDto,
 } from '@/dto/auth.dto';
 import { validateRequest } from '@/middleware/validation.middleware';
+import { getEmailRateLimitKey, getRequestRateLimitKey, rateLimit } from '@/middleware/rateLimit.middleware';
 import { authenticate } from '@/middleware/auth.middleware';
 
 /**
@@ -24,6 +26,24 @@ import { authenticate } from '@/middleware/auth.middleware';
  * @swagger
  * components:
  *   schemas:
+ *     EarlyAccessRegisterDto:
+ *       type: object
+ *       required: [firstName, lastName, email, password]
+ *       properties:
+ *         firstName:
+ *            type: string
+ minLength: 64
+ maxLength: 64
+ pattern: '^[a-f0-9]{64}$'
+ description: Single-use, high-entropy password-reset token.
+ *         lastName:
+ *           type: string
+ *         email:
+ *           type: string
+ *           format: email
+ *         password:
+ *           type: string
+ *           minLength: 8
  *     RegisterUserDto:
  *       type: object
  *       required:
@@ -110,7 +130,33 @@ const router = Router();
 router.post(
   '/register',
   validateRequest({ body: RegisterUserDto }),
+  rateLimit({ name: 'auth-register-ip', limit: 10, windowMs: 15 * 60 * 1000, key: getRequestRateLimitKey }),
   authController.register,
+);
+
+/**
+ * @swagger
+ * /auth/early-access:
+ *   post:
+ *     summary: Register for early access with an active 30-day trial
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/EarlyAccessRegisterDto'
+ *     responses:
+ *       201:
+ *         description: Account created with an active session and trial
+ *       400:
+ *         description: Invalid input or disposable email domain
+ */
+router.post(
+  '/early-access',
+  validateRequest({ body: EarlyAccessRegisterDto }),
+  rateLimit({ name: 'auth-early-access-ip', limit: 10, windowMs: 15 * 60 * 1000, key: getRequestRateLimitKey }),
+  authController.registerEarlyAccess,
 );
 
 /**
@@ -134,6 +180,8 @@ router.post(
 router.post(
   '/login',
   validateRequest({ body: LoginUserDto }),
+  rateLimit({ name: 'auth-login-ip', limit: 20, windowMs: 5 * 60 * 1000, key: getRequestRateLimitKey }),
+  rateLimit({ name: 'auth-login-account', limit: 10, windowMs: 15 * 60 * 1000, key: getEmailRateLimitKey }),
   authController.login,
 );
 
@@ -186,6 +234,8 @@ router.post(
 router.post(
   '/email/verify/reset',
   validateRequest({ body: VerifyEmailDto }),
+  rateLimit({ name: 'verify-reset-ip', limit: 3, windowMs: 15 * 60 * 1000, key: getRequestRateLimitKey }),
+  rateLimit({ name: 'verify-reset-account', limit: 3, windowMs: 15 * 60 * 1000, key: getEmailRateLimitKey }),
   authController.emailVerifyReset,
 );
 
@@ -271,6 +321,8 @@ router.post(
 router.post(
   '/forgot-password',
   validateRequest({ body: ForgotPasswordDto }),
+  rateLimit({ name: 'forgot-password-ip', limit: 3, windowMs: 15 * 60 * 1000, key: getRequestRateLimitKey }),
+  rateLimit({ name: 'forgot-password-account', limit: 3, windowMs: 15 * 60 * 1000, key: getEmailRateLimitKey }),
   authController.forgotPassword,
 );
 
@@ -302,6 +354,8 @@ router.post(
 router.post(
   '/reset-password',
   validateRequest({ body: ResetPasswordDto }),
+  rateLimit({ name: 'reset-password-ip', limit: 10, windowMs: 15 * 60 * 1000, key: getRequestRateLimitKey }),
+  rateLimit({ name: 'reset-password-account', limit: 5, windowMs: 15 * 60 * 1000, key: getEmailRateLimitKey }),
   authController.resetPassword,
 );
 
