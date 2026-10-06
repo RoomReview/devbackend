@@ -1,4 +1,4 @@
-import { object, string, nativeEnum, type infer as _infer } from 'zod';
+import { object, string, nativeEnum, record, unknown, type infer as _infer } from 'zod';
 
 export enum ScoreStatus {
   WAITING = 'WAITING',
@@ -12,6 +12,7 @@ export const CreateScoreRequestDto = object({
   postcodeId: string().optional(),
   name: string().optional(),
   description: string().optional(),
+  reportData: record(string(), unknown()).optional(),
 });
 
 export type CreateScoreRequestDto = _infer<typeof CreateScoreRequestDto>;
