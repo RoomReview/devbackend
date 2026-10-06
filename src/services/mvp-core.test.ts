@@ -25,16 +25,24 @@ describe('mvp core data layer', () => {
   });
 
   it('creates a valid review record with ratings and persisted review id', async () => {
-    const review = await createReview({
-      title: 'Good transport links',
-      content: 'The area feels safe and well connected.',
-      safety_rating: 5,
-      transport_rating: 4,
-      amenities_rating: 5,
-      value_rating: 4,
-      author_id: '33333333-3333-4333-8333-333333333333',
-      postcode_id: '22222222-2222-4222-8222-222222222222',
-    });
+    const review = await createReview(
+      {
+        title: 'Good transport links',
+        content: 'The area feels safe and well connected.',
+        safety_rating: 5,
+        transport_rating: 4,
+        amenities_rating: 5,
+        value_rating: 4,
+        pros: [],
+        cons: [],
+        years_lived: null,
+        anonymous: false,
+        postcode_id: '22222222-2222-4222-8222-222222222222',
+        borough_id: null,
+      },
+      '33333333-3333-4333-8333-333333333333',
+      async (record) => record,
+    );
 
     assert.ok(review.review_id);
     assert.equal(review.title, 'Good transport links');
