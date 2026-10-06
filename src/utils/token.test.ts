@@ -1,6 +1,11 @@
 import { equal, ok } from 'node:assert';
 import { describe, it } from 'node:test';
-import { generateVerificationCode, isCodeExpired, verifyCode } from './token';
+import {
+  generatePasswordResetToken,
+  generateVerificationCode,
+  isCodeExpired,
+  verifyCode,
+} from './token';
 
 describe('token.service', () => {
   describe('generateVerificationCode', () => {
@@ -42,6 +47,17 @@ describe('token.service', () => {
     it('should return false for non-matching code', () => {
       const { hashedCode } = generateVerificationCode();
       ok(!verifyCode('123456', hashedCode));
+    });
+  });
+
+  describe('generatePasswordResetToken', () => {
+    it('should generate a high-entropy token that can be verified against its hash', () => {
+      const result = generatePasswordResetToken();
+      equal(result.code.length, 64);
+      ok(/^[a-f0-9]{64}$/.test(result.code));
+      ok(result.code !== result.hashedCode);
+      ok(verifyCode(result.code, result.hashedCode));
+      ok(!verifyCode('123456', result.hashedCode));
     });
   });
 
