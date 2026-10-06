@@ -141,13 +141,25 @@ export const updateUserPasswordAndClearCode = async (
   userId: string,
   passwordHash: string,
 ) => {
-  return await prisma.user.update({
-    where: { userId },
-    data: {
-      passwordHash,
-      verifyCodeHash: null,
-      verifyCodeExpiry: null,
-    },
+  return await prisma.$transaction(async (tx) => {
+    const user = await tx.user.update({
+      where: { userId },
+      data: {
+        passwordHash,
+        verifyCodeHash: null,
+        verifyCodeExpiry: null,
+      },
+    });
+    await tx.session.updateMany({
+      where: { userId },
+      data: {
+        accessTokenId: null,
+        accessTokenExpiry: null,
+        refreshTokenId: null,
+        refreshTokenExpiry: null,
+      },
+    });
+    return user;
   }).catch((err: unknown) => {
     logContext.function = 'updateUserPasswordAndClearCode';
     logger.error(logContext, 'Error in updateUserPasswordAndClearCode repository', { error: err });
