@@ -38,8 +38,16 @@ export const RegisterUserDto = object({
   }
 });
 
+export const EarlyAccessRegisterDto = object({
+  firstName: string().trim().min(1),
+  lastName: string().trim().min(1),
+  email: email({ pattern: regexes.email }),
+  password: string().min(8),
+});
+
 
 export type RegisterUserDto = _infer<typeof RegisterUserDto>;
+export type EarlyAccessRegisterDto = _infer<typeof EarlyAccessRegisterDto>;
 
 export const LoginUserDto = object({
   email: email({ pattern: regexes.email }),
@@ -74,14 +82,14 @@ export const RefreshTokenDto = object({
 export type RefreshTokenDto = _infer<typeof RefreshTokenDto>;
 
 export const ForgotPasswordDto = object({
-  email: email({ pattern: regexes.email }),
+  email: email({ pattern: regexes.email }).max(254),
 });
 
 export type ForgotPasswordDto = _infer<typeof ForgotPasswordDto>;
 
 export const ResetPasswordDto = object({
-  email: email({ pattern: regexes.email }),
-  code: string().length(6),
+  email: email({ pattern: regexes.email }).max(254),
+  code: string().regex(/^[a-f0-9]{64}$/i),
   newPassword: string().min(6),
 });
 
