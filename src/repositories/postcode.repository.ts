@@ -53,6 +53,7 @@ export const findPostcodeById = async (postcodeId: string, select?: PostcodeSele
       incode: true,
       latitude: true,
       longitude: true,
+      imageUrl: true,
       metrics: true,
       boroughId: true,
       createdAt: true,
@@ -77,6 +78,7 @@ export const findPostcodeByCode = async (code: string, select?: PostcodeSelect):
       incode: true,
       latitude: true,
       longitude: true,
+      imageUrl: true,
       metrics: true,
       boroughId: true,
       createdAt: true,
@@ -102,6 +104,7 @@ export const findPostcodeByCode = async (code: string, select?: PostcodeSelect):
         incode: true,
         latitude: true,
         longitude: true,
+        imageUrl: true,
         metrics: true,
         boroughId: true,
         createdAt: true,
@@ -148,7 +151,9 @@ export const findAllPostcodes = async (
       incode: true,
       latitude: true,
       longitude: true,
+      imageUrl: true,
       boroughId: true,
+      borough: { select: { name: true } },
     },
   }).catch((err: unknown) => {
     logContext.function = 'findAllPostcodes';
