@@ -91,13 +91,24 @@ describe('score-report.service (pure functions)', () => {
       boroughScore: 88,
       postcodeScore: 89,
       scoreBreakdown: { borough: { safety: 90 }, postcode: { safety: 95 } },
-      reportData: { sample: true },
+      reportData: {
+        borough: 'Islington',
+        postcode: 'N1 9GU',
+        summary: 'Area score summary',
+        scoreBreakdown: { borough: { transport: 0, affordability: 44 } },
+      },
     };
 
-    const buf = _buildPdfBufferForTest(fakeReport);
+    const buf = _buildPdfBufferForTest(fakeReport, 'Admin User');
     assert.ok(Buffer.isBuffer(buf));
     assert.ok(buf.length > 0);
     // Basic PDF header check
     assert.strictEqual(buf.toString('utf8', 0, 8), '%PDF-1.1');
+    const pdfText = buf.toString('utf8');
+    assert.ok(pdfText.includes('Prepared for: Admin User'));
+    assert.ok(pdfText.includes('Borough - Safety: 90'));
+    assert.ok(pdfText.includes('Report details'));
+    assert.ok(!pdfText.includes('[object Object]'));
+    assert.ok(!pdfText.includes('T*'));
   });
 });
