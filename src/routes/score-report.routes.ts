@@ -168,6 +168,9 @@ router.post(
  */
 router.post('/preview', validateRequest({ body: ScorePreviewDto }), scoreReportController.previewScoreReport);
 
+router.get('/mine', authenticate, scoreReportController.listMyScoreReports);
+router.delete('/:id', authenticate, scoreReportController.deleteMyScoreReport);
+
 /**
  * @swagger
  * /score-reports/{id}:
@@ -244,3 +247,4 @@ router.post('/:id/generate', authenticate, scoreReportController.enqueueScoreRep
 router.get('/:id/pdf', authenticate, scoreReportController.getScoreReportPdf);
 
 export default router;
+
