@@ -105,6 +105,14 @@ export const deleteScoreReport = async (
   });
 };
 
+export const softDeleteScoreReportForUser = async (scoreReportId: string, userId: string) => {
+  const result = await prisma.scoreReport.updateMany({
+    where: { scoreReportId, userId, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+  return result.count > 0;
+};
+
 export const assignScoreReportOwner = async (scoreReportId: string, userId: string) => {
   await prisma.$executeRaw`
     UPDATE score_reports SET user_id = ${userId}::uuid, updated_at = CURRENT_TIMESTAMP
@@ -117,4 +125,33 @@ export const findScoreReportOwner = async (scoreReportId: string) => {
     SELECT user_id AS "userId" FROM score_reports WHERE score_report_id = ${scoreReportId} LIMIT 1
   `;
   return rows[0]?.userId ?? null;
+};
+
+export const listScoreReportsForUser = async (userId: string, skip: number, take: number) => {
+  const where = { userId, deletedAt: null };
+  const [reports, total] = await Promise.all([
+    prisma.scoreReport.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+      select: {
+        scoreReportId: true,
+        name: true,
+        status: true,
+        overallScore: true,
+        createdAt: true,
+        reportData: true,
+        reportOrders: {
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { orderId: true, status: true },
+        },
+      },
+    }),
+    prisma.scoreReport.count({ where }),
+  ]);
+
+  return { reports, total };
 };
