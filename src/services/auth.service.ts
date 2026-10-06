@@ -1,5 +1,6 @@
 import {
   RegisterUserDto,
+  EarlyAccessRegisterDto,
   VerifyEmailCodeDto,
   ResetPasswordDto,
 } from '@/dto/auth.dto';
@@ -8,10 +9,12 @@ import {
   getUserSensitiveByEmail,
   updateUserPasswordAndClearCode,
   registerUser as createUserAccount,
+  registerEarlyAccessUser as createEarlyAccessUserAccount,
 } from './user.service';
 import { comparePassword, hashPassword } from '../utils/password';
 import {
   generateVerificationCode,
+  generatePasswordResetToken,
   verifyCode,
   isCodeExpired,
   hashCode,
@@ -44,6 +47,8 @@ import {
 } from '@/repositories/users.repository';
 import { sendResetPasswordEmail, sendVerificationEmail } from '@/utils/email';
 import config from '@/config';
+import { randomUUID } from 'node:crypto';
+import { isDisposableEmail } from '@/utils/disposable-email';
 
 const logContext: LogContext = {
   service: 'auth.service',
@@ -63,8 +68,6 @@ export const registerUser = async (data: RegisterUserDto) => {
   const hashedPassword = await hashPassword(data.password);
 
   const token = generateVerificationCode();
-
-  logger.info(logContext, 'Verification token generated', { token });
 
   let emailSent = false;
   try {
@@ -94,6 +97,92 @@ export const registerUser = async (data: RegisterUserDto) => {
     isExistingUser: false,
     emailSent,
     verificationCode: emailSent ? undefined : token.code,
+  };
+};
+
+export const registerEarlyAccessUser = async (data: EarlyAccessRegisterDto) => {
+  logContext.function = 'registerEarlyAccessUser';
+  const normalizedData = {
+    ...data,
+    firstName: data.firstName.trim(),
+    lastName: data.lastName.trim(),
+    email: data.email.trim().toLowerCase(),
+  };
+  if (isDisposableEmail(normalizedData.email)) {
+    throw new ValidationError({
+      message: 'Please use a non-disposable email address',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  if (await findUserByEmail(normalizedData.email)) {
+    throw new ValidationError({
+      message: 'This email address is already taken',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  const passwordHash = await hashPassword(normalizedData.password);
+  const verification = generateVerificationCode();
+  const userId = randomUUID();
+
+  let account: Awaited<ReturnType<typeof createEarlyAccessUserAccount>>;
+  try {
+    account = await createEarlyAccessUserAccount(
+      userId,
+      {
+        email: normalizedData.email,
+        firstName: normalizedData.firstName,
+        lastName: normalizedData.lastName,
+      },
+      passwordHash,
+      verification,
+    );
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'P2002'
+    ) {
+      throw new ValidationError({
+        message: 'This email address is already taken',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+    throw error;
+  }
+  const { user, trialEndsAt } = account;
+
+  let emailSent = false;
+  try {
+    await sendVerificationEmail(
+      user.email,
+      verification.code,
+      `${user.firstName} ${user.lastName}`,
+    );
+    emailSent = true;
+  } catch (error) {
+    logger.warn(logContext, 'Early access verification email could not be sent', {
+      email: user.email,
+      error,
+    });
+  }
+
+  return {
+    user: {
+      userId: user.userId,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      isActive: user.isActive,
+      isEmailVerified: user.isEmailVerified,
+      trialStartedAt: user.trialStartedAt,
+      trialEndsAt: user.trialEndsAt,
+    },
+    trialEndsAt,
+    emailSent,
   };
 };
 
@@ -172,11 +261,6 @@ export const resetEmailVerification = async (email: string) => {
 
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
 
-  logger.info(logContext, 'Verification code reset — dev-only log', {
-    email,
-    code: token.code,
-  });
-
   return { isNewCodeGenerated: true };
 };
 
@@ -196,18 +280,12 @@ export const forgotPassword = async (email: string) => {
     });
   }
 
-  const token = generateVerificationCode();
+  const token = generatePasswordResetToken();
   const resetPasswordLink = config.sendGridTemplateParameters[config.sendResetPasswordCodeV1TemplateId].reset_pswd_button_link;
-  const resetPasswordUrl = `${resetPasswordLink}?token=${token.code}&email=${email}`;
+  const resetPasswordUrl = `${resetPasswordLink}?token=${token.code}&email=${encodeURIComponent(email)}`;
 
-  await sendResetPasswordEmail(email, user.firstName + ' ' + user.lastName, resetPasswordUrl);
   await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
-
-  logger.info(logContext, 'Password reset code generated — dev-only log', {
-    email,
-    code: token.code,
-    resetPasswordUrl,
-  });
+  await sendResetPasswordEmail(email, `${user.firstName} ${user.lastName}`, resetPasswordUrl);
 
   return { isEmailSent: true };
 };
@@ -285,10 +363,34 @@ export const verifyEmail = async (data: VerifyEmailCodeDto) => {
   }
 
   const updatedUser = await verifyUserEmailRepo(user.email);
+  const accessToken = generateAccessToken({
+    email: updatedUser.email,
+    sub: updatedUser.userId,
+    role: updatedUser.role,
+  });
+  const refreshToken = generateRefreshToken({
+    email: updatedUser.email,
+    sub: updatedUser.userId,
+    role: updatedUser.role,
+  });
+  const session = await upsertSession({
+    userId: updatedUser.userId,
+    accessTokenId: accessToken.jti ?? null,
+    accessTokenExpiry: accessToken.expiresAt ?? null,
+    refreshTokenId: refreshToken.jti ?? null,
+    refreshTokenExpiry: refreshToken.expiresAt ?? null,
+  });
 
   logger.info(logContext, 'Email verified successfully', { email: user.email });
 
-  return { user: updatedUser };
+  return {
+    user: updatedUser,
+    session: {
+      ...session,
+      accessToken: accessToken.token,
+      refreshToken: refreshToken.token,
+    },
+  };
 };
 
 export const validateAccessToken = async (token: string) => {
