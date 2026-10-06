@@ -1,11 +1,13 @@
 import type { Request, Response } from 'express';
-import type { ApiResponse } from '@/types';
+import type { AuthenticatedRequest, ApiResponse } from '@/types';
+import { UpdateReviewDto } from '@/dto/review.dto';
 import {
   createReview as createReviewService,
   deleteReview as deleteReviewService,
   findApprovedReviewsByPostcode,
   findAllReviews,
   findReviewById,
+  findReviewAuthorId,
   updateReview as updateReviewService,
   type CreateReviewInput,
 } from '@/services/review.service';
@@ -134,12 +136,22 @@ export const createReview = async (
 };
 
 export const updateReview = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
   try {
     const id = String(req.params.id ?? '');
-    const data = await updateReviewService(id, req.body);
+    const authorId = await findReviewAuthorId(id);
+    if (!authorId) {
+      res.status(404).json({ success: false, statusCode: 404, error: 'Review not found' });
+      return;
+    }
+    if (req.user?.role !== 'ADMIN' && req.user?.userId !== authorId) {
+      res.status(404).json({ success: false, statusCode: 404, error: 'Review not found' });
+      return;
+    }
+    const input = UpdateReviewDto.parse(req.body);
+    const data = await updateReviewService(id, input);
     if (!data) {
       res.status(404).json({ success: false, statusCode: 404, error: 'Review not found' });
       return;
@@ -152,18 +164,26 @@ export const updateReview = async (
       message: 'Review updated successfully',
     };
     res.status(200).json(response);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to update review';
-    res.status(400).json({ success: false, statusCode: 400, error: message });
+  } catch (_error) {
+    res.status(500).json({ success: false, statusCode: 500, error: 'Unable to update review' });
   }
 };
 
 export const deleteReview = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
   try {
     const id = String(req.params.id ?? '');
+    const authorId = await findReviewAuthorId(id);
+    if (!authorId) {
+      res.status(404).json({ success: false, statusCode: 404, error: 'Review not found' });
+      return;
+    }
+    if (req.user?.role !== 'ADMIN' && req.user?.userId !== authorId) {
+      res.status(404).json({ success: false, statusCode: 404, error: 'Review not found' });
+      return;
+    }
     const deleted = await deleteReviewService(id);
     const response: ApiResponse<null> = {
       success: deleted,
@@ -172,8 +192,7 @@ export const deleteReview = async (
       message: deleted ? 'Review deleted successfully' : 'Review not found',
     };
     res.status(response.statusCode).json(response);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to delete review';
-    res.status(400).json({ success: false, statusCode: 400, error: message });
+  } catch (_error) {
+    res.status(500).json({ success: false, statusCode: 500, error: 'Unable to delete review' });
   }
 };
