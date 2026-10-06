@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import { authenticate } from '@/middleware/auth.middleware';
+import { validateRequest } from '@/middleware/validation.middleware';
+import { UpdateReviewDto } from '@/dto/review.dto';
 import * as reviewController from '../controllers/review.controller';
 
 /**
@@ -50,7 +53,7 @@ router.get('/:id', reviewController.getReviewById);
  *       201:
  *         description: Review created successfully
  */
-router.post('/', reviewController.createReview);
+router.post('/', authenticate, reviewController.createReview);
 
 /**
  * @swagger
@@ -68,7 +71,12 @@ router.post('/', reviewController.createReview);
  *       200:
  *         description: Review updated successfully
  */
-router.put('/:id', reviewController.updateReview);
+router.put(
+  '/:id',
+  authenticate,
+  validateRequest({ body: UpdateReviewDto }),
+  reviewController.updateReview,
+);
 
 /**
  * @swagger
@@ -86,6 +94,6 @@ router.put('/:id', reviewController.updateReview);
  *       200:
  *         description: Review deleted successfully
  */
-router.delete('/:id', reviewController.deleteReview);
+router.delete('/:id', authenticate, reviewController.deleteReview);
 
 export default router;
