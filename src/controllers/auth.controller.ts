@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import {
   loginUser,
   registerUser,
+  registerEarlyAccessUser,
   logoutUser,
   resetEmailVerification,
   verifyEmail,
@@ -12,6 +13,8 @@ import {
 import { ApiResponse, AuthenticatedRequest } from '@/types';
 import logger, { LogContext } from '@/utils/logger';
 import { VerifyEmailCodeDto } from '@/dto/auth.dto';
+import { getCurrentUserProfile } from '@/services/user.service';
+import { EntityNotFoundError } from '@/utils/custom-error';
 
 const logContext: LogContext = {
   service: 'AuthController',
@@ -39,6 +42,26 @@ export const register = async (
   } catch (error) {
     logContext.function = 'register';
     logger.error(logContext, 'Error in register controller', { error });
+    throw error;
+  }
+};
+
+export const registerEarlyAccess = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const data = await registerEarlyAccessUser(req.body);
+    const resultant: ApiResponse<typeof data> = {
+      success: true,
+      statusCode: 201,
+      message: 'Early access account created successfully',
+      data,
+    };
+    return res.status(resultant.statusCode).json(resultant);
+  } catch (error) {
+    logContext.function = 'registerEarlyAccess';
+    logger.error(logContext, 'Error in early access registration', { error });
     throw error;
   }
 };
@@ -116,12 +139,12 @@ export const emailVerify = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { user } = await verifyEmail(req?.query as VerifyEmailCodeDto);
-    const resultant: ApiResponse<{ user: typeof user }> = {
+    const { user, session } = await verifyEmail(req?.query as VerifyEmailCodeDto);
+    const resultant: ApiResponse<{ user: typeof user; session: typeof session }> = {
       success: true,
       statusCode: 200,
       message: 'Email verified successfully',
-      data: { user },
+      data: { user, session },
     };
     return res.status(200).json(resultant);
   } catch (error) {
@@ -210,11 +233,16 @@ export const getMe = async (
 ): Promise<Response> => {
   try {
     const { user } = req;
-    const resultant: ApiResponse<Omit<typeof user, 'accessTokenId'>> = {
+    const profile = await getCurrentUserProfile(user!.userId);
+    if (!profile) {
+      throw new EntityNotFoundError({ message: 'User not found', code: 'ENTITY_NOT_FOUND' });
+    }
+
+    const resultant: ApiResponse<typeof profile> = {
       success: true,
       statusCode: 200,
       message: 'User fetched successfully',
-      data: { ...user, accessTokenId: undefined },
+      data: profile,
     };
     return res.status(200).json(resultant);
   } catch (error) {
