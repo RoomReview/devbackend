@@ -30,7 +30,8 @@ export const webhookStatus = async (_req: Request, res: Response): Promise<void>
 };
 
 export const createSubscriptionCheckout = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const data = await paymentService.createSubscriptionCheckout(req.user!.userId);
+  const planId = typeof req.body?.planId === 'string' ? req.body.planId : undefined;
+  const data = await paymentService.createSubscriptionCheckout(req.user!.userId, planId);
   const response: ApiResponse<typeof data> = { success: true, statusCode: 200, data, message: 'Subscription checkout created' };
   res.status(200).json(response);
 };
