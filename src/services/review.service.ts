@@ -14,7 +14,7 @@ export interface Review {
   years_lived?: number | null;
   anonymous?: boolean;
   verified?: boolean;
-  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejection_reason?: string | null;
   author_id: string;
   postcode_id?: string | null;
@@ -22,6 +22,22 @@ export interface Review {
   created_at: Date;
   updated_at: Date;
   published_at?: Date | null;
+  users?: { firstName?: string } | null;
+}
+
+export interface CreateReviewInput {
+  title: string;
+  content: string;
+  safety_rating: number;
+  transport_rating: number;
+  amenities_rating: number;
+  value_rating: number;
+  pros: string[];
+  cons: string[];
+  years_lived: number | null;
+  anonymous: boolean;
+  postcode_id: string;
+  borough_id: string | null;
 }
 
 const reviewStore = new Map<string, Review>();
@@ -34,19 +50,19 @@ const calculateOverallRating = (data: Partial<Review>) => {
     data.value_rating,
   ].filter((value): value is number => typeof value === 'number');
 
-  if (values.length === 0) return 0;
+  if (values.length === 0) {
+    return 0;
+  }
   return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
 };
 
 export const findAllReviews = async (): Promise<Review[]> => {
-  try {
-    const rows = await (prisma as any).reviews.findMany({
-      orderBy: { created_at: 'desc' },
-    });
-    return rows as Review[];
-  } catch {
-    return Array.from(reviewStore.values());
-  }
+  const rows = await prisma.reviews.findMany({
+    where: { status: 'APPROVED' },
+    orderBy: { created_at: 'desc' },
+    include: { users: { select: { firstName: true } } },
+  });
+  return rows.map((review) => (review.anonymous ? { ...review, users: null } : review));
 };
 
 export const findReviewById = async (id: string): Promise<Review | null> => {
@@ -60,45 +76,63 @@ export const findReviewById = async (id: string): Promise<Review | null> => {
   }
 };
 
-export const createReview = async (data: Partial<Review>): Promise<Review> => {
+export const findReviewAuthorId = async (id: string): Promise<string | null> => {
+  const review = await prisma.reviews.findUnique({
+    where: { review_id: id },
+    select: { author_id: true },
+  });
+  return review?.author_id ?? null;
+};
+
+export const findApprovedReviewsByPostcode = async (postcodeId: string): Promise<Review[]> => {
+  const rows = await prisma.reviews.findMany({
+    where: { postcode_id: postcodeId, status: 'APPROVED' },
+    orderBy: { created_at: 'desc' },
+    include: { users: { select: { firstName: true } } },
+  });
+  return rows.map((review) => (review.anonymous ? { ...review, users: null } : review));
+};
+
+export const createReview = async (
+  data: CreateReviewInput,
+  authorId: string,
+  persist: (review: Review) => Promise<Review> = async (review) => {
+    return prisma.reviews.create({ data: { ...review, users: undefined } });
+  },
+): Promise<Review> => {
   const now = new Date();
   const review: Review = {
-    review_id: data.review_id ?? crypto.randomUUID(),
-    title: data.title ?? 'Untitled review',
-    content: data.content ?? '',
-    safety_rating: Number(data.safety_rating ?? 0),
-    transport_rating: Number(data.transport_rating ?? 0),
-    amenities_rating: Number(data.amenities_rating ?? 0),
-    value_rating: Number(data.value_rating ?? 0),
+    review_id: crypto.randomUUID(),
+    title: data.title,
+    content: data.content,
+    safety_rating: data.safety_rating,
+    transport_rating: data.transport_rating,
+    amenities_rating: data.amenities_rating,
+    value_rating: data.value_rating,
     overall_rating: calculateOverallRating(data),
-    pros: data.pros ?? [],
-    cons: data.cons ?? [],
-    years_lived: data.years_lived ?? null,
-    anonymous: data.anonymous ?? false,
-    verified: data.verified ?? false,
-    status: data.status ?? 'PENDING',
-    rejection_reason: data.rejection_reason ?? null,
-    author_id: data.author_id ?? '00000000-0000-4000-8000-000000000000',
-    postcode_id: data.postcode_id ?? null,
-    borough_id: data.borough_id ?? null,
+    pros: data.pros,
+    cons: data.cons,
+    years_lived: data.years_lived,
+    anonymous: data.anonymous,
+    verified: false,
+    status: 'PENDING',
+    rejection_reason: null,
+    author_id: authorId,
+    postcode_id: data.postcode_id,
+    borough_id: data.borough_id,
     created_at: now,
     updated_at: now,
-    published_at: data.published_at ?? null,
+    published_at: null,
   };
 
-  try {
-    const saved = await (prisma as any).reviews.create({ data: review });
-    reviewStore.set(saved.review_id, saved as Review);
-    return saved as Review;
-  } catch {
-    reviewStore.set(review.review_id, review);
-    return review;
-  }
+  return persist(review);
 };
 
 export const updateReview = async (id: string, data: Partial<Review>): Promise<Review | null> => {
   const existing = await findReviewById(id);
-  if (!existing) return null;
+  if (!existing) {
+    return null;
+  }
 
   const next = {
     ...existing,
