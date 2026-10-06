@@ -125,7 +125,25 @@ export const createCheckout = async (scoreReportId: string, userId: string) => {
   return { order: { ...order, stripeSessionId: session.id }, checkoutUrl: session.url };
 };
 
-export const createSubscriptionCheckout = async (userId: string) => {
+const pricingPlans = {
+  individual: { name: 'Individual Agent', seats: 1, amount: 3500 },
+  'small-team': { name: 'Small Team', seats: 5, amount: 14900 },
+  branch: { name: 'Branch', seats: 10, amount: 24900 },
+} as const;
+
+export type PricingPlanId = keyof typeof pricingPlans;
+
+const isPricingPlanId = (value: string): value is PricingPlanId =>
+  Object.prototype.hasOwnProperty.call(pricingPlans, value);
+
+export const createSubscriptionCheckout = async (userId: string, planId?: string) => {
+  const selectedPlan = planId !== undefined && isPricingPlanId(planId)
+    ? { id: planId, ...pricingPlans[planId] }
+    : null;
+  if (planId !== undefined && !selectedPlan) {
+    throw new ValidationError({ message: 'Choose a valid subscription plan', code: 'VALIDATION_ERROR' });
+  }
+
   const billing = await getBillingStatus(userId);
   if (billing.trialActive) {
     throw new ValidationError({ message: 'Your free trial is still active', code: 'VALIDATION_ERROR' });
@@ -143,7 +161,18 @@ export const createSubscriptionCheckout = async (userId: string) => {
     'subscription_data[metadata][credits]': String(config.stripeSubscriptionCredits),
     'metadata[userId]': userId,
   });
-  if (config.stripeSubscriptionPriceId) {
+  if (selectedPlan) {
+    form.set('subscription_data[metadata][planId]', selectedPlan.id);
+    form.set('subscription_data[metadata][seats]', String(selectedPlan.seats));
+    form.set('metadata[planId]', selectedPlan.id);
+    form.set('line_items[0][price_data][currency]', config.stripeCurrency);
+    form.set('line_items[0][price_data][unit_amount]', String(selectedPlan.amount));
+    form.set('line_items[0][price_data][recurring][interval]', 'month');
+    form.set(
+      'line_items[0][price_data][product_data][name]',
+      `RoomReview - ${selectedPlan.name} (${selectedPlan.seats} ${selectedPlan.seats === 1 ? 'user' : 'users'})`,
+    );
+  } else if (config.stripeSubscriptionPriceId) {
     form.set('line_items[0][price]', config.stripeSubscriptionPriceId);
   } else {
     form.set('line_items[0][price_data][currency]', config.stripeCurrency);
