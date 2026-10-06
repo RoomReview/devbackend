@@ -1,12 +1,36 @@
 import type { Request, Response } from 'express';
-import type { ApiResponse } from '@/types';
+import { CreatePropertyDto, UpdatePropertyDto } from '@/dto/property.dto';
+import type { ApiResponse, AuthenticatedRequest } from '@/types';
 import {
   createProperty as createPropertyService,
   deleteProperty as deletePropertyService,
   findAllProperties,
   findPropertyById,
+  findPropertyOwnerId,
   updateProperty as updatePropertyService,
+  type Property,
 } from '@/services/property.service';
+
+const canManageProperty = (
+  req: AuthenticatedRequest,
+  res: Response,
+  ownerId: string,
+): boolean => {
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ success: false, statusCode: 401, error: 'Authentication is required' });
+    return false;
+  }
+  if (!['ADMIN', 'LANDLORD', 'AGENCY', 'AGENT'].includes(user.role)) {
+    res.status(403).json({ success: false, statusCode: 403, error: 'Insufficient permissions' });
+    return false;
+  }
+  if (user.role !== 'ADMIN' && user.userId !== ownerId) {
+    res.status(404).json({ success: false, statusCode: 404, error: 'Property not found' });
+    return false;
+  }
+  return true;
+};
 
 export const getAllProperties = async (
   _req: Request,
@@ -53,11 +77,20 @@ export const getPropertyById = async (
 };
 
 export const createProperty = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
   try {
-    const data = await createPropertyService(req.body);
+    if (!req.user?.userId) {
+      res.status(401).json({ success: false, statusCode: 401, error: 'Authentication is required' });
+      return;
+    }
+    const input = CreatePropertyDto.parse(req.body);
+    const data = await createPropertyService({
+      ...input,
+      available_from: input.available_from ? new Date(input.available_from) : null,
+      landlord_id: req.user.userId,
+    });
     const response: ApiResponse<typeof data> = {
       success: true,
       statusCode: 201,
@@ -65,19 +98,32 @@ export const createProperty = async (
       message: 'Property created successfully',
     };
     res.status(201).json(response);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to create property';
-    res.status(400).json({ success: false, statusCode: 400, error: message });
+  } catch (_error) {
+    res.status(500).json({ success: false, statusCode: 500, error: 'Unable to create property' });
   }
 };
 
 export const updateProperty = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
   try {
     const id = String(req.params.id ?? '');
-    const data = await updatePropertyService(id, req.body);
+    const ownerId = await findPropertyOwnerId(id);
+    if (!ownerId) {
+      res.status(404).json({ success: false, statusCode: 404, error: 'Property not found' });
+      return;
+    }
+    if (!canManageProperty(req, res, ownerId)) {
+      return;
+    }
+    const input = UpdatePropertyDto.parse(req.body);
+    const { available_from, ...propertyFields } = input;
+    const updateData: Partial<Property> = propertyFields;
+    if (available_from !== undefined) {
+      updateData.available_from = available_from ? new Date(available_from) : null;
+    }
+    const data = await updatePropertyService(id, updateData);
     if (!data) {
       res.status(404).json({ success: false, statusCode: 404, error: 'Property not found' });
       return;
@@ -90,18 +136,25 @@ export const updateProperty = async (
       message: 'Property updated successfully',
     };
     res.status(200).json(response);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to update property';
-    res.status(400).json({ success: false, statusCode: 400, error: message });
+  } catch (_error) {
+    res.status(500).json({ success: false, statusCode: 500, error: 'Unable to update property' });
   }
 };
 
 export const deleteProperty = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
   try {
     const id = String(req.params.id ?? '');
+    const ownerId = await findPropertyOwnerId(id);
+    if (!ownerId) {
+      res.status(404).json({ success: false, statusCode: 404, error: 'Property not found' });
+      return;
+    }
+    if (!canManageProperty(req, res, ownerId)) {
+      return;
+    }
     const deleted = await deletePropertyService(id);
     const response: ApiResponse<null> = {
       success: deleted,
@@ -110,8 +163,7 @@ export const deleteProperty = async (
       message: deleted ? 'Property deleted successfully' : 'Property not found',
     };
     res.status(response.statusCode).json(response);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to delete property';
-    res.status(400).json({ success: false, statusCode: 400, error: message });
+  } catch (_error) {
+    res.status(500).json({ success: false, statusCode: 500, error: 'Unable to delete property' });
   }
 };
