@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { UserCreateInput, UserSelect } from '@/generated/prisma/models';
 import * as userDal from '@/repositories/users.repository';
 import { PaginateArgs } from '@/types';
@@ -11,7 +12,7 @@ import {
   createAgency,
   createUserAgency,
 } from '@/repositories/agencies.repository';
-import { RegisterUserDto } from '@/dto/auth.dto';
+import { RegisterUserDto, type EarlyAccessRegisterDto } from '@/dto/auth.dto';
 
 export interface User {
   id: string;
@@ -47,6 +48,9 @@ export const findUserById = async (
     selectFields || defaultSelectFields,
   )) as User | null;
 };
+
+export const getCurrentUserProfile = async (id: string) =>
+  userDal.findUserById(id, defaultSelectFields);
 
 export const getUserSensitiveById = async (id: string) => {
   const selectFields: UserSelect = { ...defaultSelectFields, passwordHash: true };
@@ -169,6 +173,52 @@ export const registerUser = async (
     }
 
     return newUser;
+  });
+};
+
+export const registerEarlyAccessUser = async (
+  userId: string,
+  data: Omit<EarlyAccessRegisterDto, 'password'>,
+  passwordHash: string,
+  verification: { expiresAt: Date; hashedCode: string },
+) => {
+  return prisma.$transaction(async (tx) => {
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date(trialStartedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const user = await tx.user.create({
+      data: {
+        userId,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        passwordHash,
+        isEmailVerified: false,
+        isActive: true,
+        role: UserRole.TENANT,
+        verifyCodeHash: verification.hashedCode,
+        verifyCodeExpiry: verification.expiresAt,
+        trialStartedAt,
+        trialEndsAt,
+      },
+    });
+    const userCreditsId = randomUUID();
+    await tx.$executeRaw`
+      INSERT INTO billing_credit_grants
+        (billing_credit_grant_id, user_id, stripe_event_id, stripe_invoice_id, credits)
+      VALUES (${randomUUID()}::uuid, ${user.userId}::uuid, ${`early-access-trial:${user.userId}`}, NULL, 3)
+    `;
+    await tx.$executeRaw`
+      INSERT INTO user_credits
+        (user_credits_id, user_id, credits_balance, subscription_plan, created_at, updated_at)
+      VALUES (${userCreditsId}::uuid, ${user.userId}::uuid, 3, 'FREE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+    await tx.$executeRaw`
+      INSERT INTO credit_transactions
+        (credit_transaction_id, user_credits_id, amount, type, description, balance_after, created_at, updated_at)
+      VALUES (${randomUUID()}::uuid, ${userCreditsId}::uuid, 3, 'BONUS', 'Early access: three free branded reports', 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+
+    return { user, trialEndsAt };
   });
 };
 
