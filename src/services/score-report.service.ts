@@ -6,6 +6,8 @@ import {
   findScoreReportOwner,
   recoverScoreReportJobs,
   claimNextScoreReportJob,
+  listScoreReportsForUser as listScoreReportsForUserRepository,
+  softDeleteScoreReportForUser,
 } from '@/repositories/score-report.repository';
 import { findBoroughById } from '@/repositories/borough.repository';
 import { findPostcodeById } from '@/repositories/postcode.repository';
@@ -172,82 +174,177 @@ const escapePdfText = (text: string) => {
   return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 };
 
-const buildPdfBuffer = (report: Awaited<ReturnType<typeof getScoreReportById>>): Buffer => {
-  const lines = [
-    'RoomReview Score Report',
-    `Report ID: ${report.scoreReportId}`,
-    `Status: ${report.status}`,
-    `Name: ${report.name ?? 'N/A'}`,
-    `Description: ${report.description ?? 'N/A'}`,
-    `Overall score: ${report.overallScore ?? 'N/A'}`,
-    `Borough score: ${report.boroughScore ?? 'N/A'}`,
-    `Postcode score: ${report.postcodeScore ?? 'N/A'}`,
-    '---',
-    'Score breakdown:',
-  ];
+type PdfTextLine = { text: string; kind: 'title' | 'section' | 'body' | 'muted' };
 
-  const breakdown = typeof report.scoreBreakdown === 'object' && report.scoreBreakdown !== null ? report.scoreBreakdown : {};
-  for (const [key, value] of Object.entries(breakdown as Record<string, unknown>)) {
-    lines.push(`${key}: ${value ?? 'N/A'}`);
+const pdfTextStyles = {
+  title: { font: 'F2', size: 20, color: '0.10 0.15 0.23', height: 30, maxChars: 46 },
+  section: { font: 'F2', size: 11, color: '0.55 0.00 0.00', height: 23, maxChars: 70 },
+  body: { font: 'F1', size: 10, color: '0.12 0.16 0.22', height: 15, maxChars: 92 },
+  muted: { font: 'F1', size: 9, color: '0.35 0.39 0.44', height: 14, maxChars: 98 },
+} as const;
+
+const wrapPdfText = (text: string, maxChars: number): string[] => {
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const wrapped: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    if (word.length > maxChars) {
+      if (current) wrapped.push(current);
+      current = '';
+      for (let index = 0; index < word.length; index += maxChars) {
+        wrapped.push(word.slice(index, index + maxChars));
+      }
+      continue;
+    }
+
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxChars) {
+      wrapped.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
   }
 
-  lines.push('---');
-  lines.push('Report data:');
-  const data = typeof report.reportData === 'object' && report.reportData !== null ? report.reportData : {};
-  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-    lines.push(`${key}: ${JSON.stringify(value)}`);
+  if (current) wrapped.push(current);
+  return wrapped.length ? wrapped : [''];
+};
+
+const formatPdfLabel = (label: string) => label
+  .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  .replace(/[_-]+/g, ' ')
+  .replace(/^\w/, (first) => first.toUpperCase());
+
+const appendPdfValue = (lines: PdfTextLine[], label: string, value: unknown) => {
+  if (value === null || value === undefined) return;
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => appendPdfValue(lines, `${label} ${index + 1}`, item));
+    return;
   }
+  if (typeof value === 'object') {
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      appendPdfValue(lines, `${label} - ${formatPdfLabel(key)}`, nestedValue);
+    }
+    return;
+  }
+  lines.push({ text: `${label}: ${String(value)}`, kind: 'body' });
+};
 
-  const textStreamLines = lines.map((line, index) => {
-    const escaped = escapePdfText(line);
-    return index === 0
-      ? `(${escaped}) Tj
-`
-      : `T* (${escaped}) Tj
-`;
-  }).join('');
-
-  const stream = `BT /F1 12 Tf 50 760 Td ${textStreamLines}ET`;
-  const streamBytes = Buffer.from(stream, 'utf8');
-
-  const objects = [
-    '1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n',
-    '2 0 obj<< /Type /Pages /Count 1 /Kids [3 0 R] >>endobj\n',
-    `3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>endobj\n`,
-    '4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n',
-    `5 0 obj<< /Length ${streamBytes.length} >>stream\n${stream}\nendstream\nendobj\n`,
-  ].join('');
-
-  const xrefStart = Buffer.byteLength(`%PDF-1.1\n`) + Buffer.byteLength(objects);
-  const xref = [
-    'xref\n',
-    '0 6\n',
-    '0000000000 65535 f \n',
+const buildPdfBuffer = (
+  report: Awaited<ReturnType<typeof getScoreReportById>>,
+  preparedForName = '',
+): Buffer => {
+  const reportData = typeof report.reportData === 'object' && report.reportData !== null && !Array.isArray(report.reportData)
+    ? report.reportData as Record<string, unknown>
+    : {};
+  const reportScores = typeof reportData.scores === 'object' && reportData.scores !== null
+    ? reportData.scores as Record<string, unknown>
+    : {};
+  const lines: PdfTextLine[] = [
+    { text: 'RoomReview Score Report', kind: 'title' },
+    { text: 'Report details', kind: 'section' },
+    ...(preparedForName ? [{ text: `Prepared for: ${preparedForName}`, kind: 'body' as const }] : []),
+    { text: `Report ID: ${report.scoreReportId}`, kind: 'muted' },
+    { text: `Name: ${report.name ?? 'N/A'}`, kind: 'body' },
+    { text: `Status: ${report.status}`, kind: 'body' },
+    { text: `Created: ${new Date(report.createdAt).toLocaleDateString('en-GB')}`, kind: 'body' },
   ];
 
-  let offset = Buffer.byteLength('%PDF-1.1\n');
+  if (report.description) lines.push({ text: `Description: ${report.description}`, kind: 'body' });
+
+  const borough = reportData.borough;
+  const postcode = reportData.postcode;
+  if (borough || postcode) {
+    lines.push({ text: 'Location', kind: 'section' });
+    if (borough) lines.push({ text: `Borough: ${String(borough)}`, kind: 'body' });
+    if (postcode) lines.push({ text: `Postcode: ${String(postcode)}`, kind: 'body' });
+  }
+
+  lines.push({ text: 'Scores', kind: 'section' });
+  lines.push({ text: `Overall score: ${report.overallScore ?? reportScores.overallScore ?? 'N/A'}`, kind: 'body' });
+  lines.push({ text: `Borough score: ${report.boroughScore ?? reportScores.boroughScore ?? 'N/A'}`, kind: 'body' });
+  lines.push({ text: `Postcode score: ${report.postcodeScore ?? reportScores.postcodeScore ?? 'N/A'}`, kind: 'body' });
+
+  const scoreBreakdown = report.scoreBreakdown ?? reportData.scoreBreakdown;
+  if (scoreBreakdown && typeof scoreBreakdown === 'object') {
+    lines.push({ text: 'Score breakdown', kind: 'section' });
+    appendPdfValue(lines, 'Score', scoreBreakdown);
+  }
+
+  if (typeof reportData.summary === 'string' && reportData.summary.trim()) {
+    lines.push({ text: 'Summary', kind: 'section' });
+    lines.push({ text: reportData.summary, kind: 'body' });
+  }
+
+  const omittedReportDataKeys = new Set(['borough', 'postcode', 'scores', 'scoreBreakdown', 'summary', 'createdAt']);
+  const additionalData = Object.fromEntries(Object.entries(reportData).filter(([key]) => !omittedReportDataKeys.has(key)));
+  if (Object.keys(additionalData).length) {
+    lines.push({ text: 'Additional report data', kind: 'section' });
+    for (const [key, value] of Object.entries(additionalData)) {
+      appendPdfValue(lines, formatPdfLabel(key), value);
+    }
+  }
+
+  const expandedLines = lines.flatMap((line) => {
+    const style = pdfTextStyles[line.kind];
+    return wrapPdfText(line.text, style.maxChars).map((text) => ({ ...line, text }));
+  });
+  const pages: PdfTextLine[][] = [[]];
+  let usedHeight = 0;
+  for (const line of expandedLines) {
+    const lineHeight = pdfTextStyles[line.kind].height;
+    if (usedHeight + lineHeight > 680) {
+      pages.push([]);
+      usedHeight = 0;
+    }
+    pages[pages.length - 1].push(line);
+    usedHeight += lineHeight;
+  }
+
+  const pageObjectRefs = pages.map((_, index) => `${5 + index * 2} 0 R`).join(' ');
   const objectStrings = [
     '1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n',
-    '2 0 obj<< /Type /Pages /Count 1 /Kids [3 0 R] >>endobj\n',
-    '3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>endobj\n',
-    '4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n',
-    `5 0 obj<< /Length ${streamBytes.length} >>stream\n${stream}\nendstream\nendobj\n`,
+    `2 0 obj<< /Type /Pages /Count ${pages.length} /Kids [${pageObjectRefs}] >>endobj\n`,
+    '3 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n',
+    '4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>endobj\n',
   ];
 
-  for (const obj of objectStrings) {
-    xref.push(offset.toString().padStart(10, '0') + ' 00000 n \n');
-    offset += Buffer.byteLength(obj);
+  pages.forEach((page, pageIndex) => {
+    const pageObjectId = 5 + pageIndex * 2;
+    const contentObjectId = pageObjectId + 1;
+    let y = 750;
+    const commands = page.map((line) => {
+      const style = pdfTextStyles[line.kind];
+      const command = `${style.color} rg BT /${style.font} ${style.size} Tf 50 ${y} Td (${escapePdfText(line.text)}) Tj ET`;
+      y -= style.height;
+      return command;
+    });
+    commands.push(`0.45 0.48 0.52 rg BT /F1 8 Tf 50 30 Td (${pageIndex + 1} / ${pages.length}) Tj ET`);
+    const stream = commands.join('\n');
+    const streamBytes = Buffer.from(stream, 'utf8');
+    objectStrings.push(
+      `${pageObjectId} 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObjectId} 0 R >>endobj\n`,
+      `${contentObjectId} 0 obj<< /Length ${streamBytes.length} >>stream\n${stream}\nendstream\nendobj\n`,
+    );
+  });
+
+  let offset = Buffer.byteLength('%PDF-1.1\n');
+  const xrefEntries = ['0000000000 65535 f \n'];
+  for (const objectString of objectStrings) {
+    xrefEntries.push(`${offset.toString().padStart(10, '0')} 00000 n \n`);
+    offset += Buffer.byteLength(objectString);
   }
 
-  const trailer = `trailer<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
-  const pdfBuffer = Buffer.concat([
+  const xrefStart = offset;
+  const xref = `xref\n0 ${objectStrings.length + 1}\n${xrefEntries.join('')}`;
+  const trailer = `trailer<< /Size ${objectStrings.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+  return Buffer.concat([
     Buffer.from('%PDF-1.1\n', 'utf8'),
-    Buffer.from(objects, 'utf8'),
-    Buffer.from(xref.join(''), 'utf8'),
+    Buffer.from(objectStrings.join(''), 'utf8'),
+    Buffer.from(xref, 'utf8'),
     Buffer.from(trailer, 'utf8'),
   ]);
-
-  return pdfBuffer;
 };
 
 const calculateMetrics = (metrics: Record<string, unknown> = {}) => {
@@ -298,18 +395,60 @@ export const createScoreReportRequest = async (data: CreateScoreRequestDto, user
     });
   }
 
+  const reportData = data.reportData;
+  const reportMeta = typeof reportData?.meta === 'object' && reportData.meta !== null
+    ? reportData.meta as Record<string, unknown>
+    : {};
+  const reportMetrics = typeof reportData?.metrics === 'object' && reportData.metrics !== null
+    ? reportData.metrics as Record<string, unknown>
+    : {};
+  const overallScoreValue = reportMeta.overallScore ?? reportMetrics.score;
+  const overallScore = typeof overallScoreValue === 'number' && Number.isFinite(overallScoreValue)
+    ? overallScoreValue
+    : undefined;
+
   const report = await createScoreReport({
     borough: data.boroughId ? { connect: { boroughId: data.boroughId } } : undefined,
     postcode: data.postcodeId ? { connect: { postcodeId: data.postcodeId } } : undefined,
     name: data.name,
     description: data.description,
-    status: ScoreStatus.WAITING,
+    status: reportData ? ScoreStatus.READY : ScoreStatus.WAITING,
+    overallScore,
+    scoreBreakdown: (reportData?.scoreBreakdown ?? reportData?.availableScoreCategories) as any,
+    reportData: reportData as any,
   });
   await assignScoreReportOwner(report.scoreReportId, userId);
   return report;
 };
 
 export const getScoreReportOwner = (id: string) => findScoreReportOwner(id);
+
+export const listScoreReportsForUser = async (userId: string, requestedPage = 1, requestedLimit = 5) => {
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const limit = Number.isFinite(requestedLimit) ? Math.min(5, Math.max(1, Math.floor(requestedLimit))) : 5;
+  const { reports, total } = await listScoreReportsForUserRepository(userId, (page - 1) * limit, limit);
+
+  return {
+    reports: reports.map(({ reportOrders, reportData, ...report }) => {
+      const reportType = typeof reportData === 'object' && reportData !== null && !Array.isArray(reportData)
+        ? (reportData as Record<string, unknown>).reportType
+        : null;
+      return {
+        ...report,
+        hasFullReport: reportType === 'buyer' || reportType === 'investor',
+        order: reportOrders[0] ?? null,
+      };
+    }),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+export const deleteUserScoreReport = async (scoreReportId: string, userId: string) => {
+  const deleted = await softDeleteScoreReportForUser(scoreReportId, userId);
+  if (!deleted) {
+    throw new EntityNotFoundError({ message: 'Report not found', code: 'ENTITY_NOT_FOUND' });
+  }
+};
 
 export const getScoreReportById = async (id: string) => {
   const report = await findScoreReportById(id);
@@ -478,7 +617,7 @@ export const previewScoreReport = async (data: ScorePreviewDto) => {
   };
 };
 
-export const generateScoreReportPdf = async (id: string) => {
+export const generateScoreReportPdf = async (id: string, preparedForName = '') => {
   const report = await getScoreReportById(id);
   if (report.status !== ScoreStatus.READY) {
     throw new ValidationError({
@@ -486,5 +625,5 @@ export const generateScoreReportPdf = async (id: string) => {
       code: 'VALIDATION_ERROR',
     });
   }
-  return buildPdfBuffer(report);
+  return buildPdfBuffer(report, preparedForName);
 };
