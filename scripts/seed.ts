@@ -7,12 +7,12 @@ import readline from "node:readline/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const prismaCliPath = path.join(__dirname, "../node_modules/prisma/build/index.js");
 const seedsPath = path.join(__dirname, "../prisma/seeds");
 
 async function runSeed(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-        const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
-        const seedProcess = spawn(npxCommand, ["prisma", "db", "seed", "--", ...args], {
+        const seedProcess = spawn(process.execPath, [prismaCliPath, "db", "seed", "--", ...args], {
             stdio: "inherit",
             shell: false,
         });
