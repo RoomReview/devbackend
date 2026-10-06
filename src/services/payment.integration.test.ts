@@ -211,3 +211,4 @@ describe('Stripe payment integration', () => {
     assert.strictEqual(history.body.data.find((order: { scoreReportId: string }) => order.scoreReportId === failedReportId).status, 'FAILED');
   });
 });
+
