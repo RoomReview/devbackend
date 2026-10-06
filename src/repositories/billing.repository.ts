@@ -143,7 +143,65 @@ export const consumeReportCredit = async (userId: string, scoreReportId: string)
   });
 };
 
+export const grantEarlyAccessReportCredits = async (userId: string) => {
+  return prisma.$transaction(async (tx) => {
+    const eligibleUsers = await tx.$queryRaw<Array<{ userId: string }>>`
+      SELECT user_id AS "userId"
+      FROM users
+      WHERE user_id = ${userId}::uuid
+        AND role = 'TENANT'
+        AND trial_ends_at > CURRENT_TIMESTAMP
+      LIMIT 1
+    `;
+    if (eligibleUsers.length === 0) {
+      return false;
+    }
+
+    const credits = 3;
+    const eventId = `early-access-trial:${userId}`;
+    const grantInserted = await tx.$executeRaw`
+      INSERT INTO billing_credit_grants
+        (billing_credit_grant_id, user_id, stripe_event_id, stripe_invoice_id, credits)
+      VALUES (${randomUUID()}::uuid, ${userId}::uuid, ${eventId}, NULL, ${credits})
+      ON CONFLICT (stripe_event_id) DO NOTHING
+    `;
+    if (grantInserted === 0) {
+      return false;
+    }
+
+    const existingCredits = await tx.$queryRaw<Array<{ userCreditsId: string; balance: number }>>`
+      SELECT user_credits_id AS "userCreditsId", credits_balance AS balance
+      FROM user_credits
+      WHERE user_id = ${userId}::uuid
+      LIMIT 1
+      FOR UPDATE
+    `;
+    const userCreditsId = existingCredits[0]?.userCreditsId ?? randomUUID();
+    const balanceAfter = (existingCredits[0]?.balance ?? 0) + credits;
+    if (existingCredits.length > 0) {
+      await tx.$executeRaw`
+        UPDATE user_credits
+        SET credits_balance = ${balanceAfter}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_credits_id = ${userCreditsId}::uuid
+      `;
+    } else {
+      await tx.$executeRaw`
+        INSERT INTO user_credits
+          (user_credits_id, user_id, credits_balance, subscription_plan, created_at, updated_at)
+        VALUES (${userCreditsId}::uuid, ${userId}::uuid, ${balanceAfter}, 'FREE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `;
+    }
+    await tx.$executeRaw`
+      INSERT INTO credit_transactions
+        (credit_transaction_id, user_credits_id, amount, type, description, balance_after, created_at, updated_at)
+      VALUES (${randomUUID()}::uuid, ${userCreditsId}::uuid, ${credits}, 'BONUS', 'Early access: three free branded reports', ${balanceAfter}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+    return true;
+  });
+};
+
 export const getBillingStatus = async (userId: string) => {
+  await grantEarlyAccessReportCredits(userId);
   const subscription = await findBillingSubscription(userId);
   const users = await prisma.$queryRaw<Array<{ trialStartedAt: Date | null; trialEndsAt: Date | null; creditsBalance: number | null }>>`
     SELECT users.trial_started_at AS "trialStartedAt", users.trial_ends_at AS "trialEndsAt",
