@@ -5,9 +5,16 @@ dotenv.config();
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 const jwtSecret = process.env.JWT_SECRET;
 const jwtRefreshTokenSecret = process.env.JWT_REFRESH_SECRET;
+const configuredAccessTokenExpiry = process.env.JWT_EXPIRES_IN;
+
+if (configuredAccessTokenExpiry && configuredAccessTokenExpiry !== '5m') {
+  throw new Error('JWT_EXPIRES_IN must be set to 5m or omitted.');
+}
 
 if (nodeEnv === 'production' && (!jwtSecret || !jwtRefreshTokenSecret)) {
-  throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be configured in production.');
+  throw new Error(
+    'JWT_SECRET and JWT_REFRESH_SECRET must be configured in production.',
+  );
 }
 
 export const config = {
@@ -15,8 +22,9 @@ export const config = {
   nodeEnv,
   databaseUrl: process.env.DATABASE_URL ?? '',
   jwtSecret: jwtSecret ?? 'development-only-access-secret',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
-  jwtRefreshTokenSecret: jwtRefreshTokenSecret ?? 'development-only-refresh-secret',
+  jwtExpiresIn: '5m',
+  jwtRefreshTokenSecret:
+    jwtRefreshTokenSecret ?? 'development-only-refresh-secret',
   jwtRefreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
   jwtIssuer: process.env.JWT_ISSUER ?? 'roomreview-api',
   jwtAccessTokenAudience:
@@ -27,50 +35,76 @@ export const config = {
   saltKeyLength: 16,
   passwordHashLength: 64,
   sendGridApiKey: process.env.SENDGRID_API_KEY ?? '',
+  sendGridNewsletterEnabled: process.env.SENDGRID_NEWSLETTER_ENABLED === 'true',
+  sendGridNewsletterListId: process.env.SENDGRID_NEWSLETTER_LIST_ID ?? '',
+  sendGridNewsletterUnsubscribeGroupId: Number(
+    process.env.SENDGRID_NEWSLETTER_UNSUBSCRIBE_GROUP_ID ?? 0,
+  ),
+  newsletterWebhookSecret: process.env.NEWSLETTER_WEBHOOK_SECRET ?? '',
   emailFrom: process.env.EMAIL_FROM ?? '',
-  sendGridSandboxMode: process.env.SENDGRID_SANDBOX_MODE === 'false' ? false : true,
+  verificationEmailFrom: 'info@roomreview.co.uk',
+  sendGridSandboxMode:
+    process.env.SENDGRID_SANDBOX_MODE === 'false' ? false : true,
   sendGridDataResidence: 'eu',
-  sendVerifyEmailCodeV1TemplateId: 'd-2495bae5bdb84fa1b2afc8c4dacb0e59',
   sendResetPasswordCodeV1TemplateId: 'd-56e1f0eb30c34b7fb20ca9e21bab30a1',
   sendGridTemplateParameters: {
-    'd-2495bae5bdb84fa1b2afc8c4dacb0e59': {
-      name: 'Customer',
-      code: '######',
-      contact_button_link: process.env.ROOMREVIEW_CONTACT_LINK ?? '/',
-    },
     'd-56e1f0eb30c34b7fb20ca9e21bab30a1': {
       contact_button_link: process.env.ROOMREVIEW_CONTACT_LINK ?? '/',
       reset_pswd_button_link: process.env.ROOMREVIEW_RESET_PASSWORD_LINK ?? '/',
-    }
+    },
   },
   enableGoogleSSO: process.env.ENABLE_GOOGLE_SSO === 'true' ? true : false,
   enableFacebookSSO: process.env.ENABLE_FACEBOOK_SSO === 'true' ? true : false,
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-  googleCallbackUrl: process.env.GOOGLE_CALLBACK_URL ?? 'http://localhost:5000/api/v1/sso/google/callback',
+  googleCallbackUrl:
+    process.env.GOOGLE_CALLBACK_URL ??
+    'http://localhost:5000/api/v1/sso/google/callback',
   facebookAppId: process.env.FACEBOOK_APP_ID ?? '',
   facebookAppSecret: process.env.FACEBOOK_APP_SECRET ?? '',
-  facebookCallbackUrl: process.env.FACEBOOK_CALLBACK_URL ?? 'http://localhost:5000/api/v1/sso/facebook/callback',
-  frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  facebookCallbackUrl:
+    process.env.FACEBOOK_CALLBACK_URL ??
+    'http://localhost:5000/api/v1/sso/facebook/callback',
+  frontendUrl:
+    process.env.FRONTEND_URL ??
+    (nodeEnv === 'production'
+      ? 'https://roomreview.co.uk'
+      : 'http://localhost:3000'),
+  websiteUrl:
+    process.env.WEBSITE_URL ??
+    (nodeEnv === 'production'
+      ? 'https://roomreview.co.uk'
+      : (process.env.FRONTEND_URL ?? 'http://localhost:3000')),
   spaces: {
     bucket: process.env.DO_SPACES_BUCKET ?? '',
     region: process.env.DO_SPACES_REGION ?? 'lon1',
-    endpoint: process.env.DO_SPACES_ENDPOINT ?? 'https://lon1.digitaloceanspaces.com',
+    endpoint:
+      process.env.DO_SPACES_ENDPOINT ?? 'https://lon1.digitaloceanspaces.com',
     mapPrefix: process.env.DO_SPACES_MAP_PREFIX ?? 'lsoa_maps',
     accessKeyId: process.env.DO_SPACES_ACCESS_KEY_ID ?? '',
     secretAccessKey: process.env.DO_SPACES_SECRET_ACCESS_KEY ?? '',
-    signedUrlTtlSeconds: Number(process.env.DO_SPACES_SIGNED_URL_TTL_SECONDS ?? 900),
+    signedUrlTtlSeconds: Number(
+      process.env.DO_SPACES_SIGNED_URL_TTL_SECONDS ?? 900,
+    ),
   },
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
   stripeReportPriceId: process.env.STRIPE_REPORT_PRICE_ID ?? '',
   stripeSubscriptionPriceId: process.env.STRIPE_SUBSCRIPTION_PRICE_ID ?? '',
-  stripeSubscriptionCredits: Number(process.env.STRIPE_SUBSCRIPTION_CREDITS ?? 10),
-  stripeSubscriptionAmount: Number(process.env.STRIPE_SUBSCRIPTION_AMOUNT ?? 3500),
+  stripeSubscriptionCredits: Number(
+    process.env.STRIPE_SUBSCRIPTION_CREDITS ?? 10,
+  ),
+  stripeSubscriptionAmount: Number(
+    process.env.STRIPE_SUBSCRIPTION_AMOUNT ?? 3500,
+  ),
   stripeReportAmount: Number(process.env.STRIPE_REPORT_AMOUNT ?? 1999),
   stripeCurrency: process.env.STRIPE_CURRENCY ?? 'gbp',
-  stripeSuccessUrl: process.env.STRIPE_SUCCESS_URL ?? `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-  stripeCancelUrl: process.env.STRIPE_CANCEL_URL ?? `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/checkout/cancel`,
+  stripeSuccessUrl:
+    process.env.STRIPE_SUCCESS_URL ??
+    `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+  stripeCancelUrl:
+    process.env.STRIPE_CANCEL_URL ??
+    `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/checkout/cancel`,
 } as const;
 
 export default config;
