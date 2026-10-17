@@ -25,6 +25,8 @@ const router = Router();
  */
 router.get('/', reviewController.getAllReviews);
 
+router.get('/mine', authenticate, reviewController.getMyReviews);
+
 /**
  * @swagger
  * /reviews/{id}:
