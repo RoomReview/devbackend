@@ -9,7 +9,8 @@
  *      → Passport redirects to Google
  *   2. Google redirects back to GET /api/v1/sso/google/callback
  *      → Passport runs strategy → loginOrRegisterSsoUser → ssoCallback
- *      → ssoCallback redirects to frontend with ?accessToken=&refreshToken=&userId=
+ *      → ssoCallback redirects with a short-lived, single-use code in the fragment
+ *   3. Browser exchanges the code with POST /api/v1/sso/exchange
  *   3. GET /api/v1/sso/logout  (requires Bearer token)
  *      → invalidates session
  *   4. GET /api/v1/sso/me      (requires Bearer token)
@@ -21,6 +22,13 @@ import passport from 'passport';
 import * as ssoController from '../controllers/sso.controller';
 import * as authController from '../controllers/auth.controller';
 import { authenticate } from '@middleware/auth.middleware';
+import { validateRequest } from '@middleware/validation.middleware';
+import { getRequestRateLimitKey, rateLimit } from '@middleware/rateLimit.middleware';
+import { SsoExchangeCodeDto } from '@/dto/auth.dto';
+import {
+  startSsoAuthentication,
+  validateSsoOAuthState,
+} from '@middleware/sso-oauth-state.middleware';
 
 /**
  * @swagger
@@ -30,6 +38,13 @@ import { authenticate } from '@middleware/auth.middleware';
  */
 
 const router = Router();
+
+router.post(
+  '/exchange',
+  validateRequest({ body: SsoExchangeCodeDto }),
+  rateLimit({ name: 'sso-exchange-ip', limit: 20, windowMs: 5 * 60 * 1000, key: getRequestRateLimitKey }),
+  ssoController.exchangeCode,
+);
 
 /**
  * @swagger
@@ -43,7 +58,7 @@ const router = Router();
  */
 router.get(
   '/google',
-  passport.authenticate('google', { session: false, scope: ['profile', 'email'] }),
+  startSsoAuthentication('google', ['profile', 'email']),
 );
 
 /**
@@ -54,10 +69,11 @@ router.get(
  *     tags: [SSO]
  *     responses:
  *       302:
- *         description: Redirects to frontend with tokens on success
+ *         description: Redirects to frontend with a one-time code on success
  */
 router.get(
   '/google/callback',
+  validateSsoOAuthState('google'),
   passport.authenticate('google', {
     session: false,
     failureRedirect: '/api/v1/sso/failure',
@@ -77,7 +93,7 @@ router.get(
  */
 router.get(
   '/facebook',
-  passport.authenticate('facebook', { session: false, scope: ['email'] }),
+  startSsoAuthentication('facebook', ['email']),
 );
 
 /**
@@ -88,10 +104,11 @@ router.get(
  *     tags: [SSO]
  *     responses:
  *       302:
- *         description: Redirects to frontend with tokens on success
+ *         description: Redirects to frontend with a one-time code on success
  */
 router.get(
   '/facebook/callback',
+  validateSsoOAuthState('facebook'),
   passport.authenticate('facebook', {
     session: false,
     failureRedirect: '/api/v1/sso/failure',
