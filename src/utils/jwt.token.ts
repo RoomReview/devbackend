@@ -120,7 +120,7 @@ export const verifyToken = (
  *   - `jti`  unique UUID v4 per token
  *   - `iss`  `config.jwtIssuer`                   (e.g. "roomreview-api")
  *   - `aud`  `config.jwtAccessTokenAudience`       (e.g. "roomreview-client")
- *   - `exp`  `config.jwtExpiresIn`                 (default 15 m)
+ *   - `exp`  `config.jwtExpiresIn`                 (fixed at 5 m)
  */
 export const generateAccessToken = (payload: TokenInput) => {
   logContext.function = 'generateAccessToken';
