@@ -24,8 +24,6 @@ export interface SsoTokenPayload {
   userId: string;
   email: string;
   role: string;
-  accessToken: string;
-  refreshToken: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,12 +44,12 @@ function configureGoogleStrategy(): void {
       async (_accessToken, _refreshToken, profile, done) => {
 
         try {
-          const email = profile.emails?.[0]?.value;
+          const email = profile.emails?.find((candidate) => candidate.verified)?.value;
           if (!email) {
-            return done(new Error('No email returned from Google'), undefined);
+            return done(new Error('Google did not return a verified email'), undefined);
           }
 
-          const { user, session } = await loginOrRegisterSsoUser({
+          const { user } = await loginOrRegisterSsoUser({
             provider: 'google',
             id: profile.id,
             email,
@@ -63,8 +61,6 @@ function configureGoogleStrategy(): void {
             userId: user.userId,
             email: user.email,
             role: user.role,
-            accessToken: session.accessToken,
-            refreshToken: session.refreshToken,
           };
 
           return done(null, payload);
@@ -99,7 +95,7 @@ function configureFacebookStrategy(): void {
             return done(new Error('No email returned from Facebook'), undefined);
           }
 
-          const { user, session } = await loginOrRegisterSsoUser({
+          const { user } = await loginOrRegisterSsoUser({
             provider: 'facebook',
             id: profile.id,
             email,
@@ -111,8 +107,6 @@ function configureFacebookStrategy(): void {
             userId: user.userId,
             email: user.email,
             role: user.role,
-            accessToken: session.accessToken,
-            refreshToken: session.refreshToken,
           };
 
           return done(null, payload);
