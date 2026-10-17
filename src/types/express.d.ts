@@ -12,10 +12,7 @@
 declare global {
   namespace Express {
     interface User {
-      /** OAuth / SSO token payload — set by Passport strategy callback */
-      accessToken: string;
-      refreshToken: string;
-      /** Common user identity fields set by both SSO and JWT middleware */
+      /** OAuth identity or JWT-authenticated user */
       userId: string;
       email: string;
       role: string;
