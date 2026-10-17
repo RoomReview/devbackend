@@ -3,111 +3,237 @@ import config from '../config';
 import logger, { LogContext } from './logger';
 
 const logContext: LogContext = {
-    service: 'email.service',
-    function: '',
+  service: 'email.service',
+  function: '',
 };
 
 const sendEmail = async (data: MailDataRequired) => {
-    logContext.function = 'sendEmail';
-    if (!config.sendGridApiKey) {
-        const message = 'SendGrid API key is not defined';
-        logger.error(logContext, message, {});
-        throw new Error(message);
-    }
+  logContext.function = 'sendEmail';
+  if (!config.sendGridApiKey) {
+    const message = 'SendGrid API key is not defined';
+    logger.error(logContext, message, {});
+    throw new Error(message);
+  }
 
-    if (!config.emailFrom) {
-        const message = 'Email sender address is not configured';
-        logger.error(logContext, message, {});
-        throw new Error(message);
-    }
+  const senderEmail =
+    typeof data.from === 'string' ? data.from : data.from?.email;
+  if (!senderEmail) {
+    const message = 'Email sender address is not configured';
+    logger.error(logContext, message, {});
+    throw new Error(message);
+  }
 
-    sgMail.setApiKey(config.sendGridApiKey);
-    logger.info(logContext, 'Sending email', { to: data.personalizations?.[0]?.to, templateId: data.templateId });
+  sgMail.setApiKey(config.sendGridApiKey);
+  logger.info(logContext, 'Sending email', {
+    to: data.personalizations?.[0]?.to,
+    templateId: data.templateId,
+  });
 
-    try {
-        await sgMail.send(data);
-        logger.info(logContext, 'Email sent successfully', { to: data.personalizations?.[0]?.to, templateId: data.templateId });
-    } catch (error) {
-        const message = 'Failed to send email';
-        logger.error(logContext, message, { error });
-        throw new Error(message);
-    }
+  try {
+    await sgMail.send(data);
+    logger.info(logContext, 'Email sent successfully', {
+      to: data.personalizations?.[0]?.to,
+      templateId: data.templateId,
+    });
+  } catch (error) {
+    const message = 'Failed to send email';
+    logger.error(logContext, message, { error });
+    throw new Error(message, { cause: error });
+  }
 };
 
+export const sendVerificationEmail = async (
+  toEmail: string,
+  code: string,
+  name: string,
+) => {
+  if (!toEmail) {
+    throw new Error('toEmail is not defined');
+  }
+  if (!code) {
+    throw new Error('code is not defined');
+  }
+  if (!name) {
+    throw new Error('name is not defined');
+  }
+  const verificationBaseUrl =
+    config.nodeEnv === 'production'
+      ? 'https://roomreview.co.uk'
+      : config.frontendUrl;
+  const verificationUrl = new URL('/verify-email', verificationBaseUrl);
+  verificationUrl.searchParams.set('email', toEmail);
+  verificationUrl.searchParams.set('code', code);
+  if (
+    config.nodeEnv === 'production' &&
+    verificationUrl.protocol !== 'https:'
+  ) {
+    throw new Error('Verification email links must use HTTPS in production');
+  }
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  const greetingName = escapeHtml(name);
+  const linkHref = escapeHtml(verificationUrl.toString());
 
-export const sendVerificationEmail = async (toEmail: string, code: string, name: string) => {
-    let templateData: Record<string, string> = { ...config.sendGridTemplateParameters[config.sendVerifyEmailCodeV1TemplateId] };
-    if (!toEmail) {
-        throw new Error('toEmail is not defined');
-    }
-    if (!code) {
-        throw new Error('code is not defined');
-    }
-    if (!name) {
-        throw new Error('name is not defined');
-    }
-    templateData.code = code;
-    templateData.name = name;
-
-    const data: MailDataRequired = {
-        from: {
-            email: config.emailFrom,
-            name: 'RoomReview',
+  const data: MailDataRequired = {
+    from: {
+      email: config.verificationEmailFrom,
+      name: 'RoomReview',
+    },
+    subject: 'Verify your RoomReview email address',
+    text: `Hi ${name},\n\nVerify your email address by opening this link:\n${verificationUrl}\n\nOr enter this verification code: ${code}\n\nRoomReview`,
+    html: `<p>Hi ${greetingName},</p><p>Verify your email address by clicking the link below:</p><p><a href="${linkHref}">Verify my email address</a></p><p>If the button does not work, enter this verification code on RoomReview:</p><p><strong>${escapeHtml(code)}</strong></p><p>RoomReview</p>`,
+    categories: ['verification'],
+    personalizations: [
+      {
+        to: {
+          email: toEmail,
+          name,
         },
-        templateId: config.sendVerifyEmailCodeV1TemplateId,
-        categories: ['verification'],
-        personalizations: [
-            {
-                to: {
-                    email: toEmail,
-                    name: name,
-                },
-                dynamicTemplateData: templateData,
-            },
-        ],
-        mailSettings: {
-            sandboxMode: {
-                enable: config.sendGridSandboxMode,
-            },
-        },
-    };
-    await sendEmail(data);
+      },
+    ],
+    mailSettings: {
+      sandboxMode: {
+        enable: config.sendGridSandboxMode,
+      },
+    },
+  };
+  await sendEmail(data);
 };
 
-export const sendResetPasswordEmail = async (toEmail: string, name: string, resetPasswordLink?: string) => {
-    let templateData: Record<string, string> = { ...config.sendGridTemplateParameters[config.sendResetPasswordCodeV1TemplateId] };
-    if (!toEmail) {
-        throw new Error('toEmail is not defined');
-    }
-    if (!name) {
-        throw new Error('name is not defined');
-    }
-    if (resetPasswordLink) {
-        templateData.reset_pswd_button_link = resetPasswordLink;
-    }
-    templateData.name = name;
+export const sendResetPasswordEmail = async (
+  toEmail: string,
+  name: string,
+  resetPasswordLink?: string,
+) => {
+  const templateData: Record<string, string> = {
+    ...config.sendGridTemplateParameters[
+      config.sendResetPasswordCodeV1TemplateId
+    ],
+  };
+  if (!toEmail) {
+    throw new Error('toEmail is not defined');
+  }
+  if (!name) {
+    throw new Error('name is not defined');
+  }
+  if (resetPasswordLink) {
+    templateData.reset_pswd_button_link = resetPasswordLink;
+  }
+  templateData.name = name;
 
-    const data: MailDataRequired = {
-        from: {
-            email: config.emailFrom,
-            name: 'RoomReview',
+  const data: MailDataRequired = {
+    from: {
+      email: config.emailFrom,
+      name: 'RoomReview',
+    },
+    templateId: config.sendResetPasswordCodeV1TemplateId,
+    categories: ['reset-password'],
+    personalizations: [
+      {
+        to: {
+          email: toEmail,
+          name,
         },
-        templateId: config.sendResetPasswordCodeV1TemplateId,
-        categories: ['reset-password'],
-        personalizations: [
-            {
-                to: {
-                    email: toEmail,
-                    name: name,
-                },
-                dynamicTemplateData: templateData,
-            },
-        ],
-        mailSettings: {
-            sandboxMode: {
-                enable: config.sendGridSandboxMode,
-            },
-        },
-    };
-    await sendEmail(data);
+        dynamicTemplateData: templateData,
+      },
+    ],
+    mailSettings: {
+      sandboxMode: {
+        enable: config.sendGridSandboxMode,
+      },
+    },
+  };
+  await sendEmail(data);
+};
+
+export const sendReviewModerationEmail = async (
+  toEmail: string,
+  name: string,
+  reviewTitle: string,
+  status: 'APPROVED' | 'REJECTED',
+  rejectionReason?: string,
+) => {
+  if (!toEmail || !name || !reviewTitle) {
+    throw new Error('Review notification recipient and title are required');
+  }
+
+  const approved = status === 'APPROVED';
+  const outcome = approved
+    ? 'Your review has been approved and is now published.'
+    : `Your review was not approved.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`;
+  const subject = approved
+    ? 'Your RoomReview review is published'
+    : 'An update about your RoomReview review';
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  await sendEmail({
+    to: toEmail,
+    from: { email: config.emailFrom, name: 'RoomReview' },
+    subject,
+    text: `Hi ${name},\n\n${outcome}\n\nReview: ${reviewTitle}\n\nRoomReview`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>${escapeHtml(outcome)}</p><p><strong>Review:</strong> ${escapeHtml(reviewTitle)}</p><p>RoomReview</p>`,
+    categories: ['review-moderation'],
+    mailSettings: { sandboxMode: { enable: config.sendGridSandboxMode } },
+  });
+};
+
+export const sendNewsletterConfirmationEmail = async (
+  toEmail: string,
+  token: string,
+) => {
+  const confirmationUrl = new URL(
+    `/api/v1/newsletter/confirm/${encodeURIComponent(token)}`,
+    config.websiteUrl,
+  ).toString();
+  await sendEmail({
+    to: toEmail,
+    from: { email: 'info@roomreview.co.uk', name: 'RoomReview' },
+    subject: 'Confirm your RoomReview newsletter subscription',
+    text: `Please confirm your newsletter subscription by opening this link:\n${confirmationUrl}\n\nIf you did not request this, you can ignore this email.`,
+    html: `<p>Please confirm your RoomReview newsletter subscription:</p><p><a href="${confirmationUrl}">Confirm subscription</a></p><p>If you did not request this, you can ignore this email.</p>`,
+    categories: ['newsletter-confirmation'],
+    mailSettings: { sandboxMode: { enable: config.sendGridSandboxMode } },
+  });
+};
+
+export const sendNewsletterArticleEmail = async (
+  toEmail: string,
+  title: string,
+  summary: string,
+  articleUrl: string,
+  unsubscribeUrl: string,
+  unsubscribeGroupId: number,
+) => {
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  const safeTitle = escapeHtml(title);
+  const safeSummary = escapeHtml(summary);
+  const safeArticleUrl = escapeHtml(articleUrl);
+  const safeUnsubscribeUrl = escapeHtml(unsubscribeUrl);
+  await sendEmail({
+    to: toEmail,
+    from: { email: 'info@roomreview.co.uk', name: 'RoomReview' },
+    subject: `RoomReview article: ${title}`,
+    text: `${title}\n\n${summary}\n\nRead the article: ${articleUrl}\n\nUnsubscribe: ${unsubscribeUrl}`,
+    html: `<h1>${safeTitle}</h1><p>${safeSummary}</p><p><a href="${safeArticleUrl}">Read the article</a></p><p><a href="${safeUnsubscribeUrl}">Unsubscribe from article updates</a></p>`,
+    categories: ['newsletter-article'],
+    asm: { groupId: unsubscribeGroupId },
+    mailSettings: { sandboxMode: { enable: config.sendGridSandboxMode } },
+  });
 };
