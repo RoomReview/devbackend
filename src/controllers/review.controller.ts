@@ -8,6 +8,7 @@ import {
   findAllReviews,
   findReviewById,
   findReviewAuthorId,
+  findReviewsByAuthor,
   updateReview as updateReviewService,
   type CreateReviewInput,
 } from '@/services/review.service';
@@ -36,6 +37,31 @@ export const getAllReviews = async (
     res.status(200).json(response);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(500).json({ success: false, statusCode: 500, error: message });
+  }
+};
+
+export const getMyReviews = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  const authorId = req.user?.userId;
+  if (!authorId) {
+    res.status(401).json({ success: false, statusCode: 401, error: 'Authentication is required to view your reviews' });
+    return;
+  }
+
+  try {
+    const data = await findReviewsByAuthor(authorId);
+    const response: ApiResponse<typeof data> = {
+      success: true,
+      statusCode: 200,
+      data,
+      message: 'Your reviews fetched successfully',
+    };
+    res.status(200).json(response);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to fetch your reviews';
     res.status(500).json({ success: false, statusCode: 500, error: message });
   }
 };
