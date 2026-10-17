@@ -16,6 +16,7 @@ import {
   buildHousingStockData,
   buildPropertyValueData,
   buildRentData,
+  buildRentTrendData,
 } from '@/services/postcode-data.service';
 import prisma from '@config/database';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
@@ -206,10 +207,7 @@ export const getBoroughById = async (id: string) => {
     housingStockData: buildHousingStockData(housingStockRowsTyped),
     districtData: buildDistrictData(districtRowsTyped),
     rentData: buildRentData(rentQuarterlyRowsTyped),
-    rentTrendData: rentQuarterlyRowsTyped
-      .map((row) => ({ year: Number(row.year), quarter: Number(row.quarter), value: Number(row.rent_all ?? 0) }))
-      .filter((row) => Number.isFinite(row.year) && Number.isFinite(row.value) && row.value > 0)
-      .reverse(),
+    rentTrendData: buildRentTrendData(rentQuarterlyRowsTyped),
     propertyValueData: buildPropertyValueData(housingPriceRowsTyped),
     priceTrendData: housingPriceRowsTyped
       .map((row) => ({ year: Number(row.year), quarter: Number(row.quarter), value: Number(row.avg_price ?? 0) }))
@@ -234,7 +232,7 @@ export const getBoroughBySlug = async (slug: string) => {
       code: 'ENTITY_NOT_FOUND',
     });
   }
-  return borough;
+  return getBoroughById(borough.boroughId);
 };
 
 export const createNewBorough = async (data: CreateBoroughDto) => {
