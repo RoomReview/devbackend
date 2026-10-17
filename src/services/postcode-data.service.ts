@@ -140,6 +140,25 @@ export const buildRentData = (rows: Array<Record<string, unknown>>) => {
   ].filter((item) => item.rent > 0);
 };
 
+export const buildRentTrendData = (rows: Array<Record<string, unknown>>) => rows
+  .map((row) => ({
+    year: Number(row.year),
+    quarter: Number(row.quarter),
+    value: Number(row.rent_all ?? 0),
+    rentAll: Number(row.rent_all ?? 0),
+    rentOneBed: Number(row.rent_one_bed ?? 0),
+    rentTwoBed: Number(row.rent_two_bed ?? 0),
+    rentThreeBed: Number(row.rent_three_bed ?? 0),
+    rentFourPlusBed: Number(row.rent_four_plus_bed ?? 0),
+  }))
+  .filter((row) =>
+    Number.isFinite(row.year)
+    && Number.isFinite(row.quarter)
+    && [row.rentAll, row.rentOneBed, row.rentTwoBed, row.rentThreeBed, row.rentFourPlusBed]
+      .some((rent) => Number.isFinite(rent) && rent > 0),
+  )
+  .reverse();
+
 export const buildCrimeData = (row: Record<string, unknown> = {}) => {
   const metrics = [
     ['Total crimes per 1,000', row.total_crimes_per_1000, row.lon_avg_total_crimes_per_1000],
@@ -434,13 +453,15 @@ export const getPostcodeDataByCode = async (code: string) => {
       }))
     : buildPropertyValueData(housingPriceRowsTyped);
 
-  const mappedCrimeData = crimeRows.length > 0
+  const mappedCrimeData = policeRowsTyped.length > 0
+    ? buildCrimeData(policeRowsTyped[0])
+    : crimeRows.length > 0
     ? crimeRows.map((row) => ({
         label: String((row as any).crime_type ?? 'Crime'),
         crime_rate: Number((row as any).crime_rate ?? 0),
         value: Number((row as any).crime_rate ?? 0),
       }))
-    : buildCrimeData(policeRowsTyped[0] ?? {});
+    : [];
 
   const mappedDemography = lsoaDemographyRows.length > 0
     ? buildWeightedLsoaDemographyData(lsoaDemographyRows)
@@ -496,4 +517,3 @@ export const getPostcodeDataByCode = async (code: string) => {
     districtData: buildDistrictData(districtRowsTyped),
   };
 };
-
