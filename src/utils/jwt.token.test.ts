@@ -23,6 +23,13 @@ const validPayload = {
 
 describe('jwt.token.service', () => {
   describe('generateAccessToken', () => {
+    it('expires access tokens after exactly five minutes', () => {
+      const token = generateAccessToken(validPayload);
+      const decoded = verifyAccessToken(token.token);
+
+      equal(decoded.exp! - decoded.iat!, 5 * 60);
+    });
+
     it('should return a three-part JWT string', () => {
       const token = generateAccessToken(validPayload);
       ok(typeof token.token === 'string' && token.token.length > 0);
