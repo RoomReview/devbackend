@@ -81,6 +81,12 @@ export const RefreshTokenDto = object({
 
 export type RefreshTokenDto = _infer<typeof RefreshTokenDto>;
 
+export const SsoExchangeCodeDto = object({
+  code: string().length(43).regex(/^[A-Za-z0-9_-]{43}$/),
+});
+
+export type SsoExchangeCodeDto = _infer<typeof SsoExchangeCodeDto>;
+
 export const ForgotPasswordDto = object({
   email: email({ pattern: regexes.email }).max(254),
 });
