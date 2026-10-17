@@ -6,3 +6,11 @@ dist
 !.env.*.example
 /src/generated/prisma
 .eslintcache
+.tsbuildinfo
+
+# Local debugging output and generated owner reports
+/other-headers.txt
+/other-response.txt
+/owner-headers*.txt
+/owner-report*.pdf
+/tempRequest.js
