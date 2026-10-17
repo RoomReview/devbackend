@@ -6,6 +6,11 @@ const buckets = new Map<string, Bucket>();
 const maxBuckets = 20_000;
 let requestCount = 0;
 
+const respondRateLimited = (res: Response, retryAfterMs: number): void => {
+  res.setHeader('Retry After', Math.max(1, Math.ceil(retryAfterMs / 1000)));
+  res.status(429).json({ success: false, statusCode: 429, error: 'Too many requests. Please try again later.' });
+};
+
 export const rateLimit = ({
   name,
   limit,
@@ -31,7 +36,11 @@ export const rateLimit = ({
   let bucket = buckets.get(bucketKey);
   if (!bucket || bucket.resetAt <= now) {
     if (buckets.size >= maxBuckets) {
-      res.status(429).json({ success: false, statusCode: 429, error: 'Too many requests. Please try again later.' });
+      let nextResetAt = Number.POSITIVE_INFINITY;
+      for (const existingBucket of buckets.values()) {
+        nextResetAt = Math.min(nextResetAt, existingBucket.resetAt);
+      }
+      respondRateLimited(res, nextResetAt - now);
       return;
     }
     bucket = { count: 0, resetAt: now + windowMs };
@@ -40,8 +49,7 @@ export const rateLimit = ({
 
   bucket.count += 1;
   if (bucket.count > limit) {
-    res.setHeader('Retry-After', Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)));
-    res.status(429).json({ success: false, statusCode: 429, error: 'Too many requests. Please try again later.' });
+    respondRateLimited(res, bucket.resetAt - now);
     return;
   }
 
