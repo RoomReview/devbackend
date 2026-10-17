@@ -1,6 +1,7 @@
 import { UserSelect, UserCreateInput } from '@/generated/prisma/models';
 import logger, { LogContext } from '@/utils/logger';
 import prisma from '@config/database';
+import { InternalServerError, ValidationError } from '@/utils/custom-error';
 
 const logContext: LogContext = {
   service: 'UserRepository',
@@ -127,14 +128,75 @@ export const updateUserPassword = async (
   userId: string,
   passwordHash: string,
 ) => {
-  return await prisma.user.update({
-    where: { userId },
-    data: { passwordHash },
+  return await prisma.$transaction(async (tx) => {
+    const user = await tx.user.update({
+      where: { userId },
+      data: { passwordHash },
+    });
+    await tx.session.updateMany({
+      where: { userId },
+      data: {
+        accessTokenId: null,
+        accessTokenExpiry: null,
+        refreshTokenId: null,
+        refreshTokenExpiry: null,
+      },
+    });
+    return user;
   }).catch((err: unknown) => {
     logContext.function = 'updateUserPassword';
     logger.error(logContext, 'Error in updateUserPassword repository', { error: err });
     throw new Error('DB: updateUserPassword operation failed');
   });
+};
+
+export interface EmailPreferences {
+  emailOnReviewApproved: boolean;
+  emailOnReviewRejected: boolean;
+}
+
+export const getEmailPreferences = async (userId: string): Promise<EmailPreferences | null> => {
+  const rows = await prisma.$queryRaw<EmailPreferences[]>`
+    SELECT email_on_review_approved AS "emailOnReviewApproved",
+      email_on_review_rejected AS "emailOnReviewRejected"
+    FROM users
+    WHERE user_id = ${userId}::uuid
+  `;
+  return rows[0] ?? null;
+};
+
+export const updateEmailPreferences = async (
+  userId: string,
+  preferences: EmailPreferences,
+): Promise<EmailPreferences | null> => {
+  const rows = await prisma.$queryRaw<EmailPreferences[]>`
+    UPDATE users
+    SET email_on_review_approved = ${preferences.emailOnReviewApproved},
+      email_on_review_rejected = ${preferences.emailOnReviewRejected},
+      updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}::uuid
+    RETURNING email_on_review_approved AS "emailOnReviewApproved",
+      email_on_review_rejected AS "emailOnReviewRejected"
+  `;
+  return rows[0] ?? null;
+};
+
+export interface ReviewNotificationRecipient extends EmailPreferences {
+  email: string;
+  firstName: string;
+}
+
+export const getReviewNotificationRecipient = async (
+  userId: string,
+): Promise<ReviewNotificationRecipient | null> => {
+  const rows = await prisma.$queryRaw<ReviewNotificationRecipient[]>`
+    SELECT email, first_name AS "firstName",
+      email_on_review_approved AS "emailOnReviewApproved",
+      email_on_review_rejected AS "emailOnReviewRejected"
+    FROM users
+    WHERE user_id = ${userId}::uuid
+  `;
+  return rows[0] ?? null;
 };
 
 export const updateUserPasswordAndClearCode = async (
@@ -209,7 +271,7 @@ export const findUserByFacebookId = async (facebookId: string) => {
   });
 };
 
-export type SsoUpsertInput = {
+export type SsoCreateInput = {
   email: string;
   firstName: string;
   lastName: string;
@@ -218,40 +280,50 @@ export type SsoUpsertInput = {
 };
 
 /**
- * Creates a new SSO user or, if the email already exists, links the SSO identity
- * onto the existing account (auto-link strategy).
+ * Creates an SSO user without linking the provider identity to an existing email.
  */
-export const upsertSsoUser = async (data: SsoUpsertInput) => {
+export const createSsoUser = async (data: SsoCreateInput) => {
   const { email, firstName, lastName, googleId, facebookId } = data;
-  return await prisma.user.upsert({
-    where: { email },
-    create: {
-      email,
-      firstName,
-      lastName,
-      isEmailVerified: true,
-      isActive: true,
-      googleId: googleId ?? null,
-      facebookId: facebookId ?? null,
-    },
-    update: {
-      ...(googleId ? { googleId } : {}),
-      ...(facebookId ? { facebookId } : {}),
-    },
-    select: {
-      userId: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      isEmailVerified: true,
-      isActive: true,
-      googleId: true,
-      facebookId: true,
-    },
-  }).catch((err: unknown) => {
-    logContext.function = 'upsertSsoUser';
-    logger.error(logContext, 'Error in upsertSsoUser repository', { error: err });
-    throw new Error('DB: upsertSsoUser operation failed');
-  });
+  try {
+    return await prisma.user.create({
+      data: {
+        email,
+        firstName,
+        lastName,
+        isEmailVerified: true,
+        isActive: true,
+        googleId: googleId ?? null,
+        facebookId: facebookId ?? null,
+      },
+      select: {
+        userId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isEmailVerified: true,
+        isActive: true,
+        googleId: true,
+        facebookId: true,
+      },
+    });
+  } catch (error) {
+    logContext.function = 'createSsoUser';
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'P2002'
+    ) {
+      throw new ValidationError({
+        message: 'An account with this email already exists. Please sign in with your existing account.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+    logger.error(logContext, 'Error in createSsoUser repository', { error });
+    throw new InternalServerError({
+      message: 'Unable to create SSO account',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
 };
