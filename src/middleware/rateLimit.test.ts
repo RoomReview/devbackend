@@ -14,10 +14,14 @@ describe('rateLimit middleware', () => {
       key: () => ip,
     });
     let responseStatus = 200;
+    let retryAfter: string | number | undefined;
     let nextCalls = 0;
     const req = {} as Request;
     const res = {
-      setHeader: () => undefined,
+      setHeader: (name: string, value: string | number) => {
+        if (name === 'Retry-After') retryAfter = value;
+        return res;
+      },
       status: (status: number) => {
         responseStatus = status;
         return res;
@@ -34,5 +38,7 @@ describe('rateLimit middleware', () => {
 
     assert.equal(nextCalls, 2);
     assert.equal(responseStatus, 429);
+    assert.match(String(retryAfter), /^\d+$/);
+    assert.ok(Number(retryAfter) >= 1);
   });
 });
