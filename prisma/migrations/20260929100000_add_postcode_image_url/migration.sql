@@ -1,1 +1,2 @@
-ALTER TABLE "postcodes" ADD COLUMN IF NOT EXISTS "image_url" TEXT;
+ALTER TABLE "score_reports"
+ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMP(3);
