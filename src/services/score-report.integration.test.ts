@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, beforeEach, after } from 'node:test';
 import request from 'supertest';
 import app from '../index';
 import prisma from '../config/database';
@@ -14,15 +14,31 @@ describe('Score report integration', () => {
   let postcodeId: string;
   let scoreReportId: string;
 
-  before(async () => {
-    const userId = '00000000-0000-0000-0000-000000000001';
-    const adminTokenObj = generateAccessToken({
-      sub: userId,
+  const refreshAdminToken = async () => {
+    const token = generateAccessToken({
+      sub: '00000000-0000-0000-0000-000000000001',
       email: 'admin-test@roomreview.test',
       role: UserRole.ADMIN,
     });
-    adminToken = adminTokenObj.token;
+    adminToken = token.token;
+    const tokenExpiry = token.expiresAt ?? new Date(Date.now() + 5 * 60 * 1000);
 
+    await prisma.session.upsert({
+      where: { userId: '00000000-0000-0000-0000-000000000001' },
+      update: {
+        accessTokenId: token.jti,
+        accessTokenExpiry: tokenExpiry,
+      },
+      create: {
+        userId: '00000000-0000-0000-0000-000000000001',
+        accessTokenId: token.jti,
+        accessTokenExpiry: tokenExpiry,
+      },
+    });
+  };
+
+  before(async () => {
+    const userId = '00000000-0000-0000-0000-000000000001';
     await prisma.user.upsert({
       where: { userId },
       update: {
@@ -45,18 +61,7 @@ describe('Score report integration', () => {
       },
     });
 
-    await prisma.session.upsert({
-      where: { userId },
-      update: {
-        accessTokenId: adminTokenObj.jti,
-        accessTokenExpiry: new Date(Date.now() + 1000 * 60 * 15),
-      },
-      create: {
-        userId,
-        accessTokenId: adminTokenObj.jti,
-        accessTokenExpiry: new Date(Date.now() + 1000 * 60 * 15),
-      },
-    });
+    await refreshAdminToken();
 
     const borough = await prisma.borough.create({
       data: {
@@ -92,6 +97,8 @@ describe('Score report integration', () => {
     });
     postcodeId = postcode.postcodeId;
   });
+
+  beforeEach(refreshAdminToken);
 
   after(async () => {
     await prisma.scoreReport.deleteMany({ where: { boroughId } }).catch(() => null);
