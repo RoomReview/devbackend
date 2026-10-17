@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import prisma from '@config/database';
 import type { ApiResponse } from '@/types';
+import { redactAnalyticsUrl } from '@/utils/analytics-url';
 
 const analyticsEventSchema = z.object({
   eventName: z.literal('page_view'),
@@ -23,7 +24,13 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
   }
 
   await prisma.analyticsEvent.create({
-    data: parsedEvent.data,
+    data: {
+      ...parsedEvent.data,
+      path: redactAnalyticsUrl(parsedEvent.data.path),
+      referrer: parsedEvent.data.referrer
+        ? redactAnalyticsUrl(parsedEvent.data.referrer)
+        : undefined,
+    },
   });
 
   res.status(201).json({
