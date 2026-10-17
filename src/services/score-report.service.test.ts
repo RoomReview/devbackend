@@ -23,12 +23,11 @@ describe('score-report.service (pure functions)', () => {
     assert.deepStrictEqual(breakdown, {
       safety: 90,
       affordability: 80,
-      transport: 80,
       amenities: 70,
       health: 70,
       education: 80,
     });
-    assert.strictEqual(score, 79);
+    assert.strictEqual(score, 78);
   });
 
   it('should reuse borough metrics when scoring a postcode', () => {
@@ -43,7 +42,7 @@ describe('score-report.service (pure functions)', () => {
     const result = _calculateLocationScoresForTest(
       boroughMetrics,
       true,
-      { crimeScore: 80, affordabilityScore: 90, transportScore: 2 },
+      { crimeScore: 80, affordabilityScore: 90 },
     );
 
     assert.notStrictEqual(result.postcodeResult.score, result.boroughResult.score);
@@ -64,7 +63,7 @@ describe('score-report.service (pure functions)', () => {
     assert.deepStrictEqual(breakdown, {});
   });
 
-  it('should calculate a score from stored borough summary metrics', () => {
+  it('should not infer a transport score from a fare zone', () => {
     const { score, breakdown } = _calculateMetricsScoreForTest({
       trend: '3.8%',
       zones: 'Zone 1',
@@ -77,8 +76,12 @@ describe('score-report.service (pure functions)', () => {
     assert.ok((score ?? 0) > 0);
     assert.deepStrictEqual(breakdown, {
       affordability: 26,
-      transport: 100,
     });
+  });
+
+  it('does not calculate a transport score from an explicit but unverified score field', () => {
+    const { breakdown } = _calculateMetricsScoreForTest({ transportScore: 73 });
+    assert.deepStrictEqual(breakdown, {});
   });
 
   it('should build a non-empty PDF buffer from a synthetic report', () => {
