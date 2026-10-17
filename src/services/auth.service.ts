@@ -21,9 +21,9 @@ import {
 } from '../utils/token';
 import {
   findUserSessionByAccessTokenId,
-  findUserSessionByRefreshTokenId,
   logoutSessionByUserId,
   upsertSession,
+  rotateActiveUserSession,
 } from '@/repositories/sessions.repository';
 import {
   generateAccessToken,
@@ -34,6 +34,7 @@ import {
 import logger, { LogContext } from '@/utils/logger';
 import {
   EntityNotFoundError,
+  InternalServerError,
   UnauthorizedError,
   ValidationError,
 } from '@utils/custom-error';
@@ -43,11 +44,16 @@ import {
   verifyUserEmail as verifyUserEmailRepo,
   findUserByGoogleId,
   findUserByFacebookId,
-  upsertSsoUser,
+  findUserById,
+  createSsoUser,
 } from '@/repositories/users.repository';
+import {
+  consumeSsoLoginCode,
+  createSsoLoginCode as createSsoLoginCodeRecord,
+} from '@/repositories/sso-login-codes.repository';
 import { sendResetPasswordEmail, sendVerificationEmail } from '@/utils/email';
 import config from '@/config';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { isDisposableEmail } from '@/utils/disposable-email';
 
 const logContext: LogContext = {
@@ -408,6 +414,13 @@ export const validateAccessToken = async (token: string) => {
   if (!session) {
     throw new UnauthorizedError({ message: 'Invalid token' });
   }
+  const user = await findUserById(sub, { isActive: true });
+  if (!user?.isActive) {
+    throw new UnauthorizedError({
+      message: 'Account is deactivated',
+      code: 'UNAUTHORIZED',
+    });
+  }
 
   return { user: { email, role, userId: sub }, session };
 };
@@ -424,26 +437,30 @@ export const refreshAccessToken = async (refreshToken: string) => {
     });
   }
 
-  // Look up live session — absence means the token was revoked or never stored
-  const session = await findUserSessionByRefreshTokenId(jti, userId);
-  if (!session) {
-    throw new UnauthorizedError({
-      message: 'Refresh token is not recognised or has been revoked',
-    });
-  }
-
   // Issue fresh access and refresh tokens
   const accessTokenObj = generateAccessToken({ email, sub: userId, role });
   const refreshTokenObj = generateRefreshToken({ email, sub: userId, role });
+  if (!accessTokenObj.jti || !refreshTokenObj.jti) {
+    throw new InternalServerError({
+      message: 'Unable to create refreshed session tokens',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
 
-  // Persist the new access token and refresh token JTI + expiry on the session
-  await upsertSession({
+  const rotated = await rotateActiveUserSession({
     userId,
-    accessTokenId: accessTokenObj.jti ?? null,
+    refreshTokenId: jti,
+    accessTokenId: accessTokenObj.jti,
     accessTokenExpiry: accessTokenObj.expiresAt ?? null,
-    refreshTokenId: refreshTokenObj.jti ?? null,
+    newRefreshTokenId: refreshTokenObj.jti,
     refreshTokenExpiry: refreshTokenObj.expiresAt ?? null,
   });
+  if (!rotated) {
+    throw new UnauthorizedError({
+      message: 'Refresh token is not recognised, revoked, or the account is deactivated',
+      code: 'UNAUTHORIZED',
+    });
+  }
 
   logger.info(logContext, 'Access token refreshed', { userId });
 
@@ -473,8 +490,8 @@ export interface SsoProfile {
  * Logs in an existing user or registers a new one via an SSO provider.
  * Lookup order:
  *   1. Find by provider-specific ID (googleId / facebookId)
- *   2. Auto-link: find by email and attach SSO identity
- *   3. Create brand-new SSO-only user
+ *   2. Reject email matches not already linked to this provider
+ *   3. Create a brand-new SSO-only user
  * In all cases a JWT session is upserted and returned.
  */
 export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
@@ -487,16 +504,24 @@ export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
       ? await findUserByGoogleId(id)
       : await findUserByFacebookId(id);
 
-  // 2. Auto-link by email (or create new) via upsert
-  const user =
-    byId ??
-    (await upsertSsoUser({
+  let user = byId;
+  if (!user) {
+    const existingEmail = await findUserByEmail(email, { userId: true });
+    if (existingEmail) {
+      throw new ValidationError({
+        message: 'An account with this email already exists. Please sign in with your existing account.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    user = await createSsoUser({
       email,
       firstName,
       lastName,
       googleId: provider === 'google' ? id : undefined,
       facebookId: provider === 'facebook' ? id : undefined,
-    }));
+    });
+  }
 
   if (!user.isActive) {
     throw new ValidationError({
@@ -505,34 +530,73 @@ export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
     });
   }
 
-  const accessTokenObj = generateAccessToken({
-    email: user.email,
-    sub: user.userId,
-    role: user.role,
-  });
-
-  const refreshTokenObj = generateRefreshToken({
-    email: user.email,
-    sub: user.userId,
-    role: user.role,
-  });
-
-  const currentSession = await upsertSession({
-    userId: user.userId,
-    accessTokenId: accessTokenObj?.jti ?? null,
-    refreshTokenId: refreshTokenObj?.jti ?? null,
-    accessTokenExpiry: accessTokenObj.expiresAt ?? null,
-    refreshTokenExpiry: refreshTokenObj.expiresAt ?? null,
-  });
-
   logger.info(logContext, 'SSO login successful', { provider, userId: user.userId });
+
+  return { user };
+};
+
+const hashSsoLoginCode = (code: string) =>
+  createHash('sha256').update(code).digest('hex');
+
+export const createSsoLoginCode = async (userId: string): Promise<string> => {
+  const code = randomBytes(32).toString('base64url');
+  await createSsoLoginCodeRecord(
+    hashSsoLoginCode(code),
+    userId,
+    new Date(Date.now() + 2 * 60 * 1000),
+  );
+  return code;
+};
+
+export const exchangeSsoLoginCode = async (code: string) => {
+  const userId = await consumeSsoLoginCode(hashSsoLoginCode(code));
+  if (!userId) {
+    throw new UnauthorizedError({
+      message: 'SSO login code is invalid or expired',
+      code: 'UNAUTHORIZED',
+    });
+  }
+
+  const user = await findUserById(userId, {
+    userId: true,
+    email: true,
+    firstName: true,
+    lastName: true,
+    role: true,
+    isActive: true,
+    isEmailVerified: true,
+  });
+  if (!user?.isActive) {
+    throw new UnauthorizedError({
+      message: 'SSO account is unavailable',
+      code: 'UNAUTHORIZED',
+    });
+  }
+
+  const accessToken = generateAccessToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
+  const refreshToken = generateRefreshToken({
+    email: user.email,
+    sub: user.userId,
+    role: user.role,
+  });
+  const session = await upsertSession({
+    userId: user.userId,
+    accessTokenId: accessToken.jti ?? null,
+    accessTokenExpiry: accessToken.expiresAt ?? null,
+    refreshTokenId: refreshToken.jti ?? null,
+    refreshTokenExpiry: refreshToken.expiresAt ?? null,
+  });
 
   return {
     user,
     session: {
-      currentSession,
-      accessToken: accessTokenObj.token,
-      refreshToken: refreshTokenObj.token,
+      sessionId: session.sessionId,
+      accessToken: accessToken.token,
+      refreshToken: refreshToken.token,
     },
   };
 };
