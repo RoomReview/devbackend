@@ -45,4 +45,4 @@ fs.writeFileSync(
   'utf-8'
 );
 
-console.log(`✅ Swagger documentation generated successfully at ${outputPath}`);
+console.log(`Swagger documentation generated successfully at ${outputPath}`);
