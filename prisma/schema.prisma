@@ -17,6 +17,8 @@ model User {
   bio              String?
   passwordHash     String?            @map("password_hash")
   isEmailVerified  Boolean            @default(false) @map("is_email_verified")
+  emailOnReviewApproved Boolean       @default(true) @map("email_on_review_approved")
+  emailOnReviewRejected Boolean       @default(true) @map("email_on_review_rejected")
   isActive         Boolean            @default(true) @map("is_active")
   role             UserRole           @default(TENANT)
   verifyCodeHash   String?            @map("verify_code_hash")
@@ -30,7 +32,9 @@ model User {
   properties       properties[]
   reviews          reviews[]
   saved_properties saved_properties[]
+  savedSearches   SavedSearch[]
   sessions         Session?
+  ssoLoginCodes    SsoLoginCode[]
   agencies         UserAgency[]
   user_credits     user_credits?
   scoreReports     ScoreReport[]
@@ -69,6 +73,18 @@ model Session {
   users              User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model SsoLoginCode {
+  codeHash  String   @id @map("code_hash") @db.Char(64)
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("sso_login_codes")
 }
 
 model Agency {
@@ -206,7 +222,7 @@ model ReportOrder {
 model PaymentWebhookEvent {
   eventId     String   @id @map("event_id")
   eventType   String   @map("event_type")
-  status      String   @default("PROCESSING")
+  status      String   @default("QUEUED")
   processedAt DateTime @default(now()) @map("processed_at")
 
   @@map("payment_webhook_events")
@@ -418,10 +434,21 @@ model newsletter_subscribers {
   email                    String   @unique
   confirmed                Boolean  @default(false)
   confirm_token            String?
+  unsubscribe_token        String?  @unique
   created_at               DateTime @default(now())
   updated_at               DateTime
 
   @@index([email])
+}
+
+model newsletter_article_deliveries {
+  article_id  String   @id
+  title       String
+  summary     String
+  url         String
+  status      String   @default("PROCESSING")
+  queued_at   DateTime @default(now())
+  sent_at     DateTime?
 }
 
 model properties {
@@ -577,6 +604,19 @@ model saved_properties {
 
   @@unique([user_id, property_id])
   @@index([user_id])
+}
+
+model SavedSearch {
+  savedSearchId String   @id @default(uuid(7)) @map("saved_search_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  postcode      String   @db.VarChar(8)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, postcode])
+  @@index([userId, createdAt])
+  @@map("saved_searches")
 }
 
 model user_credits {
