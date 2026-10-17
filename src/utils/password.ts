@@ -47,3 +47,4 @@ export const comparePassword = async (
   )) as Buffer;
   return hashToCompare.toString('hex') === hash;
 };
+
