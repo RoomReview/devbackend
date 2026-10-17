@@ -91,11 +91,29 @@ export const getAdminUsers = async (): Promise<AdminUser[]> => {
 };
 
 export const setUserActive = async (userId: string, isActive: boolean) => {
-  const rows = await prisma.$queryRaw<Array<{ userId: string; isActive: boolean }>>`
-    UPDATE users
-    SET is_active = ${isActive}, updated_at = CURRENT_TIMESTAMP
-    WHERE user_id = ${userId}::uuid
-    RETURNING user_id AS "userId", is_active AS "isActive"
-  `;
-  return rows[0] ?? null;
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ userId: string; isActive: boolean }>>`
+      UPDATE users
+      SET is_active = ${isActive}, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ${userId}::uuid
+      RETURNING user_id AS "userId", is_active AS "isActive"
+    `;
+    if (rows.length === 0) {
+      return null;
+    }
+
+    if (!isActive) {
+      await tx.$executeRaw`
+        UPDATE sessions
+        SET access_token_id = NULL,
+          access_token_expiry = NULL,
+          refresh_token_id = NULL,
+          refresh_token_expiry = NULL,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ${userId}::uuid
+      `;
+    }
+
+    return rows[0];
+  });
 };
