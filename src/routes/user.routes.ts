@@ -6,7 +6,7 @@ import {
   requireMatchingUser,
 } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
-import { ChangePasswordDto } from '@/dto/user.dto';
+import { ChangePasswordDto, UpdateEmailPreferencesDto } from '@/dto/user.dto';
 
 /**
  * @swagger
@@ -49,6 +49,14 @@ import { ChangePasswordDto } from '@/dto/user.dto';
  */
 
 const router = Router();
+
+router.get('/me/email-preferences', authenticate, userController.getEmailPreferences);
+router.put(
+  '/me/email-preferences',
+  authenticate,
+  validateRequest({ body: UpdateEmailPreferencesDto }),
+  userController.updateEmailPreferences,
+);
 
 /**
  * @swagger
