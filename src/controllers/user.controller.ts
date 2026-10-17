@@ -1,8 +1,11 @@
 import {
   findAllUsers,
   changePassword as changePasswordService,
+  getAccountEmailPreferences,
+  updateAccountEmailPreferences,
 } from '@/services/user.service';
-import { ApiResponse } from '@/types';
+import type { ApiResponse, AuthenticatedRequest } from '@/types';
+import { UpdateEmailPreferencesDto } from '@/dto/user.dto';
 import type { Request, Response } from 'express';
 
 export const getAllUsers = async (
@@ -100,4 +103,45 @@ export const changePassword = async (
     success: true,
   };
   res.status(200).json(resultant);
+};
+
+export const getEmailPreferences = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, statusCode: 401, error: 'Authentication required' });
+    return;
+  }
+  const data = await getAccountEmailPreferences(userId);
+  const response: ApiResponse<typeof data> = {
+    message: 'Email preferences fetched successfully',
+    data,
+    statusCode: 200,
+    success: true,
+  };
+  res.status(200).json(response);
+};
+
+export const updateEmailPreferences = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, statusCode: 401, error: 'Authentication required' });
+    return;
+  }
+  const data = await updateAccountEmailPreferences(
+    userId,
+    UpdateEmailPreferencesDto.parse(req.body),
+  );
+  const response: ApiResponse<typeof data> = {
+    message: 'Email preferences saved successfully',
+    data,
+    statusCode: 200,
+    success: true,
+  };
+  res.status(200).json(response);
 };
