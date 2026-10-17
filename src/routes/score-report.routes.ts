@@ -3,6 +3,8 @@ import * as scoreReportController from '@/controllers/score-report.controller';
 import { authenticate } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { CreateScoreRequestDto, ScorePreviewDto } from '@/dto/score.dto';
+import { AreaReportPdfDto } from '@/dto/report-pdf.dto';
+import { getRequestRateLimitKey, rateLimit } from '@/middleware/rateLimit.middleware';
 
 /**
  * @swagger
@@ -112,6 +114,50 @@ import { CreateScoreRequestDto, ScorePreviewDto } from '@/dto/score.dto';
  */
 
 const router = Router();
+
+/**
+ * @swagger
+ * /score-reports/pdf-render:
+ *   post:
+ *     summary: Render an area report as a paginated PDF
+ *     tags: [ScoreReports]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [html, css, postcode]
+ *             properties:
+ *               html:
+ *                 type: string
+ *               css:
+ *                 type: string
+ *               postcode:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: A PDF with each report section beginning on a new page
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
+router.post(
+  '/pdf-render',
+  authenticate,
+  validateRequest({ body: AreaReportPdfDto }),
+  rateLimit({
+    name: 'area-report-pdf-ip',
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+    key: getRequestRateLimitKey,
+  }),
+  scoreReportController.renderAreaReportPdf,
+);
 
 /**
  * @swagger
@@ -247,4 +293,3 @@ router.post('/:id/generate', authenticate, scoreReportController.enqueueScoreRep
 router.get('/:id/pdf', authenticate, scoreReportController.getScoreReportPdf);
 
 export default router;
-
