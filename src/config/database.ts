@@ -14,6 +14,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 const connectionString = `${process.env.DATABASE_URL}`;
+const databasePoolMax = Number(process.env.DATABASE_POOL_MAX ?? 5);
+
+if (!Number.isInteger(databasePoolMax) || databasePoolMax < 1) {
+	throw new Error('DATABASE_POOL_MAX must be a positive integer.');
+}
 
 const extractHostPort = (conn: string | undefined) => {
 	try {
@@ -47,7 +52,7 @@ if (!connectionString) {
 	throw new Error('Missing DATABASE_URL');
 }
 
-const adapter = new PrismaPg({ connectionString });
+const adapter = new PrismaPg({ connectionString, max: databasePoolMax });
 const prismaLogLevels: ('query' | 'error')[] = process.env.PRISMA_LOG_QUERIES === 'true'
 	? ['query', 'error']
 	: ['error'];
