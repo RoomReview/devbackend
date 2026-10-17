@@ -13,6 +13,7 @@ import {
   buildHousingStockData,
   buildPropertyValueData,
   buildRentData,
+  buildRentTrendData,
 } from '../services/postcode-data.service';
 
 describe('postcode-data.service mapping helpers', () => {
@@ -30,6 +31,36 @@ describe('postcode-data.service mapping helpers', () => {
     assert.deepStrictEqual(rentData[0], { rent: 1800, type: 'average' });
     assert.strictEqual(rentData[1].type, '1-bed');
     assert.strictEqual(rentData[2].type, '2-bed');
+  });
+
+  it('includes bedroom-specific rent values in chronological trend rows', () => {
+    const trend = buildRentTrendData([
+      { year: 2026, quarter: 1, rent_all: 2200, rent_two_bed: 2500 },
+      { year: 2021, quarter: 1, rent_all: 1400, rent_two_bed: 1700 },
+    ]);
+
+    assert.deepStrictEqual(trend, [
+      {
+        year: 2021,
+        quarter: 1,
+        value: 1400,
+        rentAll: 1400,
+        rentOneBed: 0,
+        rentTwoBed: 1700,
+        rentThreeBed: 0,
+        rentFourPlusBed: 0,
+      },
+      {
+        year: 2026,
+        quarter: 1,
+        value: 2200,
+        rentAll: 2200,
+        rentOneBed: 0,
+        rentTwoBed: 2500,
+        rentThreeBed: 0,
+        rentFourPlusBed: 0,
+      },
+    ]);
   });
 
   it('builds crime data from police rows', () => {
@@ -213,4 +244,3 @@ describe('spaces-assets.service', () => {
     assert.strictEqual(new URL(signedUrl).pathname, '/lsoa_maps/E01000001_2026-09.webp');
   });
 });
-
