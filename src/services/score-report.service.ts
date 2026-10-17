@@ -37,13 +37,6 @@ const scoreCategories = [
     weight: 0.2,
   },
   {
-    name: 'transport',
-    keys: ['transportScore', 'accessScore', 'publicTransportScore', 'commuteScore'],
-    max: 10,
-    invert: false,
-    weight: 0.18,
-  },
-  {
     name: 'amenities',
     keys: ['amenitiesScore', 'walkScore', 'leisureScore'],
     max: 10,
@@ -100,18 +93,12 @@ const withDerivedScoreMetrics = (metrics: Record<string, unknown>): Record<strin
   const derived = { ...metrics };
   const rating = parseMetricNumber(metrics.rating);
   const averageRent = parseMetricNumber(metrics.avgRent);
-  const zone = parseMetricNumber(metrics.zones);
-
   if (getMetricValue(derived, ['score', 'quality']) === undefined && rating !== undefined) {
     derived.score = Math.max(0, Math.min(100, rating * 20));
   }
   if (getMetricValue(derived, ['affordabilityScore', 'costOfLiving', 'medianRent', 'medianPrice']) === undefined && averageRent !== undefined) {
     derived.affordabilityScore = Math.max(0, Math.min(100, (averageRent / 4000) * 100));
   }
-  if (getMetricValue(derived, ['transportScore', 'accessScore', 'publicTransportScore', 'commuteScore']) === undefined && zone !== undefined) {
-    derived.transportScore = Math.max(0, Math.min(10, 11 - zone));
-  }
-
   return derived;
 };
 
