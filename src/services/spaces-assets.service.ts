@@ -32,6 +32,7 @@ export const createSpacesObjectUrlSigner = (settings: SpacesSignerConfig) => {
           accessKeyId: settings.accessKeyId,
           secretAccessKey: settings.secretAccessKey,
         },
+        responseChecksumValidation: 'WHEN_REQUIRED',
       })
     : null;
 
