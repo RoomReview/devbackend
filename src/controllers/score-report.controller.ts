@@ -6,6 +6,8 @@ import type { AuthenticatedRequest } from '@/types';
 import * as paymentService from '@/services/payment.service';
 import { ValidationError } from '@/utils/custom-error';
 import { getCurrentUserProfile } from '@/services/user.service';
+import * as reportPdfService from '@/services/report-pdf.service';
+import type { AreaReportPdfRequest } from '@/dto/report-pdf.dto';
 
 const getSingleParamValue = (value: string | string[] | undefined): string => {
   if (typeof value === 'string') {
@@ -116,5 +118,15 @@ export const getScoreReportPdf = async (req: AuthenticatedRequest, res: Response
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="score-report-${id}.pdf"`);
+  res.status(200).send(pdfBuffer);
+};
+
+export const renderAreaReportPdf = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { html, css, postcode } = req.body as AreaReportPdfRequest;
+  const pdfBuffer = await reportPdfService.renderAreaReportPdf({ html, css, postcode });
+  const filenamePart = postcode.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="roomreview-${filenamePart || 'area-report'}.pdf"`);
   res.status(200).send(pdfBuffer);
 };
