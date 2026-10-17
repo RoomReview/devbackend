@@ -3,24 +3,27 @@
  *
  * Handles the result of a completed Passport OAuth callback.
  * After Passport resolves, req.user contains an SsoTokenPayload.
- * We redirect to the frontend with the JWT tokens in the query string.
+ * We redirect with a short-lived, single-use code; JWTs are returned only by POST.
  */
 
 import type { Request, Response } from 'express';
 import type { SsoTokenPayload } from '@utils/sso.login';
-import { logoutUser } from '@services/auth.service';
+import {
+  createSsoLoginCode,
+  exchangeSsoLoginCode,
+  logoutUser,
+} from '@services/auth.service';
 import config from '@config/index';
 import logger, { LogContext } from '@utils/logger';
-import type { AuthenticatedRequest } from '@/types';
-import type { ApiResponse } from '@/types';
+import type { ApiResponse, AuthenticatedRequest } from '@/types';
 
 const logContext: LogContext = { service: 'SsoController', function: '' };
 
 /**
  * Called after a successful OAuth callback.
- * Redirects the browser to the frontend with JWT tokens in query params.
+ * Redirects the browser to the frontend with an opaque one-time code in the fragment.
  */
-export const ssoCallback = (req: Request, res: Response): void => {
+export const ssoCallback = async (req: Request, res: Response): Promise<void> => {
   logContext.function = 'ssoCallback';
 
   const payload = req.user as SsoTokenPayload | undefined;
@@ -33,18 +36,29 @@ export const ssoCallback = (req: Request, res: Response): void => {
     return;
   }
 
-  const params = new URLSearchParams({
-    accessToken: payload.accessToken,
-    refreshToken: payload.refreshToken,
-    userId: payload.userId,
-    role: payload.role,
-  });
+  const code = await createSsoLoginCode(payload.userId);
 
   logger.info(logContext, 'SSO callback success — redirecting to frontend', {
     userId: payload.userId,
   });
 
-  res.redirect(`${config.frontendUrl}/auth/sso/callback?${params.toString()}`);
+  res.redirect(
+    `${config.frontendUrl}/auth/sso/callback#code=${code}`,
+  );
+};
+
+export const exchangeCode = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await exchangeSsoLoginCode(req.body.code);
+  const response: ApiResponse<typeof result> = {
+    success: true,
+    statusCode: 200,
+    message: 'SSO login completed successfully',
+    data: result,
+  };
+  res.status(200).json(response);
 };
 
 /**
