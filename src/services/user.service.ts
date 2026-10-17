@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { UserCreateInput, UserSelect } from '@/generated/prisma/models';
 import * as userDal from '@/repositories/users.repository';
 import { PaginateArgs } from '@/types';
-import { ChangePasswordDto } from '@/dto/user.dto';
+import { ChangePasswordDto, UpdateEmailPreferencesDto } from '@/dto/user.dto';
 import { EntityNotFoundError, UnauthorizedError } from '@/utils/custom-error';
 import { comparePassword, hashPassword } from '@/utils/password';
 import { paginate } from '@/utils/helpers';
@@ -89,6 +89,25 @@ export const changePassword = async (id: string, data: ChangePasswordDto) => {
 
 
   return { success: true };
+};
+
+export const getAccountEmailPreferences = async (userId: string) => {
+  const preferences = await userDal.getEmailPreferences(userId);
+  if (!preferences) {
+    throw new EntityNotFoundError({ message: 'User not found', code: 'ENTITY_NOT_FOUND' });
+  }
+  return preferences;
+};
+
+export const updateAccountEmailPreferences = async (
+  userId: string,
+  data: UpdateEmailPreferencesDto,
+) => {
+  const preferences = await userDal.updateEmailPreferences(userId, data);
+  if (!preferences) {
+    throw new EntityNotFoundError({ message: 'User not found', code: 'ENTITY_NOT_FOUND' });
+  }
+  return preferences;
 };
 
 export const findUserByEmail = async (
