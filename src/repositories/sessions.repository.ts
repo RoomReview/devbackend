@@ -1,6 +1,7 @@
 import { SessionCreateInput, SessionModel } from '@/generated/prisma/models';
 import logger, { LogContext } from '@/utils/logger';
 import prisma from '@config/database';
+import { InternalServerError } from '@/utils/custom-error';
 
 const logContext: LogContext = {
   service: 'SessionRepository',
@@ -123,4 +124,37 @@ export const findUserSessionByRefreshTokenId = async (
     logger.error(logContext, 'Error in findUserSessionByRefreshTokenId repository', { error: err });
     throw new Error('DB: findUserSessionByRefreshTokenId operation failed');
   });
+};
+
+export const rotateActiveUserSession = async (data: {
+  userId: string;
+  refreshTokenId: string;
+  accessTokenId: string;
+  accessTokenExpiry: Date | null;
+  newRefreshTokenId: string;
+  refreshTokenExpiry: Date | null;
+}): Promise<boolean> => {
+  logContext.function = 'rotateActiveUserSession';
+  try {
+    const updated = await prisma.$executeRaw`
+      UPDATE sessions AS s
+      SET access_token_id = ${data.accessTokenId}::uuid,
+        access_token_expiry = ${data.accessTokenExpiry},
+        refresh_token_id = ${data.newRefreshTokenId}::uuid,
+        refresh_token_expiry = ${data.refreshTokenExpiry},
+        updated_at = CURRENT_TIMESTAMP
+      FROM users AS u
+      WHERE s.user_id = u.user_id
+        AND u.user_id = ${data.userId}::uuid
+        AND u.is_active = true
+        AND s.refresh_token_id = ${data.refreshTokenId}::uuid
+    `;
+    return updated === 1;
+  } catch (error) {
+    logger.error(logContext, 'Error rotating active user session', { error });
+    throw new InternalServerError({
+      message: 'Unable to refresh session',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
 };
