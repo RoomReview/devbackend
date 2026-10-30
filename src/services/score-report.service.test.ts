@@ -4,6 +4,7 @@ import {
   _buildPdfBufferForTest,
   _calculateLocationScoresForTest,
   _calculateMetricsScoreForTest,
+  _getScoreReportWorkerRetryDelayMsForTest,
 } from '../services/score-report.service';
 
 const boroughMetrics = {
@@ -17,6 +18,13 @@ const boroughMetrics = {
 };
 
 describe('score-report.service (pure functions)', () => {
+  it('backs off score report polling after transient failures and caps the delay', () => {
+    assert.deepStrictEqual(
+      [1, 2, 3, 4, 5, 6, 7].map(_getScoreReportWorkerRetryDelayMsForTest),
+      [1000, 2000, 4000, 8000, 16000, 30000, 30000],
+    );
+  });
+
   it('should compute category-level normalized values', () => {
     const { score, breakdown } = _calculateMetricsScoreForTest(boroughMetrics);
     assert.strictEqual(typeof score, 'number');
@@ -111,6 +119,8 @@ describe('score-report.service (pure functions)', () => {
     assert.ok(pdfText.includes('Prepared for: Admin User'));
     assert.ok(pdfText.includes('Borough - Safety: 90'));
     assert.ok(pdfText.includes('Report details'));
+    assert.ok(pdfText.includes('Powered by RoomReview'));
+    assert.ok(pdfText.includes('https://roomreview.co.uk'));
     assert.ok(!pdfText.includes('[object Object]'));
     assert.ok(!pdfText.includes('T*'));
   });
