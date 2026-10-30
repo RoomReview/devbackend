@@ -25,6 +25,21 @@ export interface AdminUser {
   } | null;
 }
 
+export interface AdminAuditLogEntry {
+  auditLogId: string;
+  actorUserId: string;
+  actorEmail: string;
+  action: string;
+  resource: string;
+  resourceId: string | null;
+  details: unknown;
+  method: string;
+  path: string;
+  statusCode: number | null;
+  ipAddress: string | null;
+  createdAt: Date;
+}
+
 type CountRow = { count: bigint };
 type FailureRow = {
   kind: 'REPORT' | 'PAYMENT';
@@ -88,6 +103,27 @@ export const getAdminUsers = async (): Promise<AdminUser[]> => {
     LEFT JOIN billing_subscriptions bs ON bs.user_id = u.user_id
     ORDER BY u.created_at DESC
   `;
+};
+
+export const getAdminAuditLogs = async (limit: number): Promise<AdminAuditLogEntry[]> => {
+  return prisma.adminAuditLog.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    select: {
+      auditLogId: true,
+      actorUserId: true,
+      actorEmail: true,
+      action: true,
+      resource: true,
+      resourceId: true,
+      details: true,
+      method: true,
+      path: true,
+      statusCode: true,
+      ipAddress: true,
+      createdAt: true,
+    },
+  });
 };
 
 export const setUserActive = async (userId: string, isActive: boolean) => {
