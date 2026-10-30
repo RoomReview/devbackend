@@ -5,8 +5,10 @@ import {
   sendVerificationEmail,
   sendResetPasswordEmail,
   sendReviewModerationEmail,
+  sendSubscriptionInvoiceEmail,
   sendNewsletterConfirmationEmail,
   sendNewsletterArticleEmail,
+  sendAgencyInvitationEmail,
 } from './email';
 import sgMail from '@sendgrid/mail';
 
@@ -49,6 +51,17 @@ describe('sendVerificationEmail', () => {
         },
       },
     });
+
+  });
+
+  it('preserves a team invitation through the email verification link', async () => {
+    if (!config.sendGridApiKey) {
+      (config as any).sendGridApiKey = 'test';
+    }
+    await sendVerificationEmail('agent@example.com', '123456', 'Agent', 'invitation-token');
+    const mockCalls = (sgMail.send as any).mock.calls;
+    const data = mockCalls[mockCalls.length - 1].arguments[0];
+    assert.match(data.text, /teamInviteToken=invitation-token/);
   });
 
   it('should throw error if toEmail is not defined', async () => {
@@ -83,11 +96,12 @@ describe('sendResetPasswordEmail', () => {
   it('should send reset password email', async () => {
     const toEmail = 'test@example.com';
     const name = 'Test';
+    const resetPasswordLink = 'https://roomreview.co.uk/reset-password?token=token';
     if (!config.sendGridApiKey) {
       (config as any).sendGridApiKey = 'test';
     }
 
-    await sendResetPasswordEmail(toEmail, name);
+    await sendResetPasswordEmail(toEmail, name, resetPasswordLink);
 
     const mockCalls = (sgMail.send as any).mock.calls;
     const lastCallArgs = mockCalls[mockCalls.length - 1].arguments[0];
@@ -109,10 +123,17 @@ describe('sendResetPasswordEmail', () => {
             ...config.sendGridTemplateParameters[
               config.sendResetPasswordCodeV1TemplateId
             ],
+            reset_pswd_button_link: resetPasswordLink,
             name: name,
           },
         },
       ],
+      trackingSettings: {
+        clickTracking: {
+          enable: false,
+          enableText: false,
+        },
+      },
       mailSettings: {
         sandboxMode: {
           enable: config.sendGridSandboxMode,
@@ -161,6 +182,81 @@ describe('sendReviewModerationEmail', () => {
     assert.match(data.html, /&lt;Review&gt;/);
     assert.match(data.html, /&lt;Please remove private details&gt;/);
     assert.doesNotMatch(data.html, /<Please remove private details>/);
+  });
+});
+
+describe('sendSubscriptionInvoiceEmail', () => {
+  it('sends a paid subscription invoice with an escaped invoice link', async () => {
+    const originalEmailFrom = config.emailFrom;
+    if (!config.sendGridApiKey) {
+      (config as any).sendGridApiKey = 'test';
+    }
+    if (!config.emailFrom) {
+      (config as any).emailFrom = 'billing@example.com';
+    }
+
+    try {
+      await sendSubscriptionInvoiceEmail(
+        'customer@example.com',
+        'Test Customer',
+        {
+          number: '<INV-123>',
+          amountPaid: 1750,
+          currency: 'gbp',
+          hostedInvoiceUrl: 'https://billing.example.com/invoice?id=1&source=stripe',
+          invoicePdf: 'https://billing.example.com/invoice.pdf',
+        },
+      );
+
+      const mockCalls = (sgMail.send as any).mock.calls;
+      const data = mockCalls[mockCalls.length - 1].arguments[0];
+      assert.equal(data.to, 'customer@example.com');
+      assert.equal(data.from.email, config.emailFrom);
+      assert.equal(data.subject, 'Your RoomReview subscription invoice <INV-123>');
+      assert.match(data.text, /£17\.50/);
+      assert.match(data.text, /https:\/\/billing\.example\.com\/invoice\?id=1&source=stripe/);
+      assert.match(data.html, /&lt;INV-123&gt;/);
+      assert.match(data.html, /id=1&amp;source=stripe/);
+      assert.equal(data.categories[0], 'subscription-invoice');
+    } finally {
+      (config as any).emailFrom = originalEmailFrom;
+    }
+  });
+
+  it('rejects invalid invoice amounts', async () => {
+    await assert.rejects(
+      sendSubscriptionInvoiceEmail('customer@example.com', 'Test Customer', {
+        number: 'INV-123',
+        amountPaid: -1,
+        currency: 'gbp',
+        hostedInvoiceUrl: null,
+        invoicePdf: null,
+      }),
+      { message: 'Invoice amount must be a non-negative number' },
+    );
+  });
+});
+
+describe('sendAgencyInvitationEmail', () => {
+  it('sends an invitation link and escapes agency details in the email body', async () => {
+    if (!config.sendGridApiKey) {
+      (config as any).sendGridApiKey = 'test';
+    }
+    await sendAgencyInvitationEmail(
+      'agent@example.com',
+      '<Founder>',
+      'A&B Agency',
+      'invitation-token',
+    );
+
+    const mockCalls = (sgMail.send as any).mock.calls;
+    const data = mockCalls[mockCalls.length - 1].arguments[0];
+    assert.equal(data.personalizations[0].to.email, 'agent@example.com');
+    assert.match(data.text, /invited you to join A&B Agency on RoomReview/);
+    assert.match(data.html, /&lt;Founder&gt;/);
+    assert.match(data.html, /A&amp;B Agency/);
+    assert.match(data.html, /team-invite\?token=invitation-token/);
+    assert.equal(data.categories[0], 'agency-invitation');
   });
 });
 
