@@ -14,6 +14,19 @@ describe('report-pdf.service', () => {
 
     assert.strictEqual(pageCount, 1);
     assert.match(pdfText, /\/MediaBox\s*\[\s*0\s+0\s+594\.\d+\s+841\.\d+\s*\]/);
+    assert.match(pdfText, /\/URI \(https:\/\/roomreview\.co\.uk\/?\)/);
+  });
+
+  it('adds one linked attribution to branded reports', async () => {
+    const pdf = await renderAreaReportPdf({
+      postcode: 'BR1 1AB',
+      html: '<div class="buyer-report-document"><a href="https://roomreview.co.uk">Powered by RoomReview</a><main><section>Area summary</section></main></div>',
+      css: '',
+    });
+    const pdfText = pdf.toString('latin1');
+
+    assert.strictEqual((pdfText.match(/\/Subtype \/Link/g) ?? []).length, 1);
+    assert.match(pdfText, /\/URI \(https:\/\/roomreview\.co\.uk\/?\)/);
   });
 
   it('flows long report sections across the required number of A4 pages', async () => {
