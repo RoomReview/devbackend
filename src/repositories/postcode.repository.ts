@@ -134,6 +134,7 @@ export const findAllPostcodes = async (
   offset: number,
   filter?: FindPostcodesFilter,
   select?: PostcodeSelect,
+  sortDirection: 'asc' | 'desc' = 'asc',
 ): Promise<PostcodeRecord[]> => {
   const where: Record<string, unknown> = {};
   if (filter?.outcode) where.outcode = filter.outcode;
@@ -143,7 +144,7 @@ export const findAllPostcodes = async (
     where,
     take: limit,
     skip: offset,
-    orderBy: { code: 'asc' },
+    orderBy: { code: sortDirection },
     select: select || {
       postcodeId: true,
       code: true,
@@ -159,6 +160,38 @@ export const findAllPostcodes = async (
     logContext.function = 'findAllPostcodes';
     logger.error(logContext, 'Error in findAllPostcodes repository', { error: err });
     throw new Error('DB: findAllPostcodes operation failed');
+  });
+};
+
+export const findPostcodesByIds = async (
+  postcodeIds: string[],
+  filter?: FindPostcodesFilter,
+): Promise<PostcodeRecord[]> => {
+  const where: Record<string, unknown> = { postcodeId: { in: postcodeIds } };
+  if (filter?.outcode) {
+    where.outcode = filter.outcode;
+  }
+  if (filter?.boroughId) {
+    where.boroughId = filter.boroughId;
+  }
+
+  return await getPostcodeClient().findMany({
+    where,
+    select: {
+      postcodeId: true,
+      code: true,
+      outcode: true,
+      incode: true,
+      latitude: true,
+      longitude: true,
+      imageUrl: true,
+      boroughId: true,
+      borough: { select: { name: true } },
+    },
+  }).catch((err: unknown) => {
+    logContext.function = 'findPostcodesByIds';
+    logger.error(logContext, 'Error in findPostcodesByIds repository', { error: err });
+    throw new Error('DB: findPostcodesByIds operation failed');
   });
 };
 
