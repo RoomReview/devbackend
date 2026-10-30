@@ -3,6 +3,7 @@ import * as propertyController from '@controllers/property.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { CreatePropertyDto, UpdatePropertyDto } from '@/dto/property.dto';
+import { auditAdminAction } from '@/middleware/admin-audit.middleware';
 
 /**
  * @swagger
@@ -57,6 +58,7 @@ router.post(
   '/',
   authenticate,
   authorize('manage:properties'),
+  auditAdminAction,
   validateRequest({ body: CreatePropertyDto }),
   propertyController.createProperty,
 );
@@ -80,6 +82,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  auditAdminAction,
   validateRequest({ body: UpdatePropertyDto }),
   propertyController.updateProperty,
 );
@@ -100,6 +103,6 @@ router.put(
  *       200:
  *         description: Property deleted successfully
  */
-router.delete('/:id', authenticate, propertyController.deleteProperty);
+router.delete('/:id', authenticate, auditAdminAction, propertyController.deleteProperty);
 
 export default router;
