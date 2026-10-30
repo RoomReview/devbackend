@@ -211,6 +211,12 @@ describe('spaces-assets.service', () => {
     assert.strictEqual(parsedUrl.pathname, '/lsoa_maps/E01000001_2026-09.webp');
     assert.strictEqual(parsedUrl.searchParams.get('X-Amz-Expires'), '900');
     assert.ok(parsedUrl.searchParams.has('X-Amz-Signature'));
+    assert.match(
+      parsedUrl.searchParams.get('X-Amz-Credential') ?? '',
+      /\/lon1\/s3\/aws4_request$/,
+    );
+    assert.strictEqual(parsedUrl.searchParams.has('x-amz-checksum-mode'), false);
+    assert.strictEqual(parsedUrl.searchParams.has('x-amz-checksum-crc32'), false);
   });
 
   it('does not create a URL unless bucket credentials are configured', async () => {
@@ -244,3 +250,4 @@ describe('spaces-assets.service', () => {
     assert.strictEqual(new URL(signedUrl).pathname, '/lsoa_maps/E01000001_2026-09.webp');
   });
 });
+
