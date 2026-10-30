@@ -3,6 +3,7 @@ import {
   findScoreReportById,
   updateScoreReport,
   assignScoreReportOwner,
+  deleteScoreReport,
   findScoreReportOwner,
   recoverScoreReportJobs,
   claimNextScoreReportJob,
@@ -13,8 +14,8 @@ import { findBoroughById } from '@/repositories/borough.repository';
 import { findPostcodeById } from '@/repositories/postcode.repository';
 import logger, { LogContext } from '@/utils/logger';
 import { EntityNotFoundError, ValidationError } from '@/utils/custom-error';
-import type { CreateScoreRequestDto, ScorePreviewDto } from '@/dto/score.dto';
-import { ScoreStatus } from '@/dto/score.dto';
+import { ScoreStatus, type CreateScoreRequestDto, type ScorePreviewDto } from '@/dto/score.dto';
+import { completeGeneratedReport } from '@/repositories/billing.repository';
 
 const logContext: LogContext = {
   service: 'ScoreReportService',
@@ -290,6 +291,7 @@ const buildPdfBuffer = (
   }
 
   const pageObjectRefs = pages.map((_, index) => `${5 + index * 2} 0 R`).join(' ');
+  const attributionAnnotationId = 5 + pages.length * 2;
   const objectStrings = [
     '1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n',
     `2 0 obj<< /Type /Pages /Count ${pages.length} /Kids [${pageObjectRefs}] >>endobj\n`,
@@ -307,14 +309,20 @@ const buildPdfBuffer = (
       y -= style.height;
       return command;
     });
+    if (pageIndex === pages.length - 1) {
+      commands.push('0.12 0.16 0.22 rg BT /F2 9 Tf 50 50 Td (Powered by RoomReview) Tj ET');
+    }
     commands.push(`0.45 0.48 0.52 rg BT /F1 8 Tf 50 30 Td (${pageIndex + 1} / ${pages.length}) Tj ET`);
     const stream = commands.join('\n');
     const streamBytes = Buffer.from(stream, 'utf8');
     objectStrings.push(
-      `${pageObjectId} 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObjectId} 0 R >>endobj\n`,
+      `${pageObjectId} 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObjectId} 0 R${pageIndex === pages.length - 1 ? ` /Annots [${attributionAnnotationId} 0 R]` : ''} >>endobj\n`,
       `${contentObjectId} 0 obj<< /Length ${streamBytes.length} >>stream\n${stream}\nendstream\nendobj\n`,
     );
   });
+  objectStrings.push(
+    `${attributionAnnotationId} 0 obj<< /Type /Annot /Subtype /Link /Rect [48 46 180 62] /Border [0 0 0] /A << /Type /Action /S /URI /URI (https://roomreview.co.uk) >> >>endobj\n`,
+  );
 
   let offset = Buffer.byteLength('%PDF-1.1\n');
   const xrefEntries = ['0000000000 65535 f \n'];
@@ -399,12 +407,29 @@ export const createScoreReportRequest = async (data: CreateScoreRequestDto, user
     postcode: data.postcodeId ? { connect: { postcodeId: data.postcodeId } } : undefined,
     name: data.name,
     description: data.description,
-    status: reportData ? ScoreStatus.READY : ScoreStatus.WAITING,
+    status: ScoreStatus.WAITING,
     overallScore,
     scoreBreakdown: (reportData?.scoreBreakdown ?? reportData?.availableScoreCategories) as any,
     reportData: reportData as any,
   });
   await assignScoreReportOwner(report.scoreReportId, userId);
+  if (reportData) {
+    const completed = await completeGeneratedReport(userId, report.scoreReportId, {
+      status: ScoreStatus.READY,
+      overallScore,
+      scoreBreakdown: (reportData.scoreBreakdown ?? reportData.availableScoreCategories) as any,
+      reportData: reportData as any,
+      failureReason: null,
+    });
+    if (!completed) {
+      await deleteScoreReport(report.scoreReportId);
+      throw new ValidationError({
+        message: 'A report credit is required to generate a report',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+    return await getScoreReportById(report.scoreReportId);
+  }
   return report;
 };
 
@@ -494,7 +519,11 @@ const generateScoreReportNow = async (id: string) => {
     scoreBreakdown,
   );
 
-  return await updateScoreReport(id, {
+  const ownerId = await findScoreReportOwner(id);
+  if (!ownerId) {
+    throw new EntityNotFoundError({ message: 'Score report owner not found', code: 'ENTITY_NOT_FOUND' });
+  }
+  const completed = await completeGeneratedReport(ownerId, id, {
     status: ScoreStatus.READY,
     overallScore,
     boroughScore,
@@ -503,6 +532,13 @@ const generateScoreReportNow = async (id: string) => {
     reportData: reportData as any,
     failureReason: null,
   });
+  if (!completed) {
+    throw new ValidationError({
+      message: 'A report credit or paid order is required to generate a report',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+  return await getScoreReportById(id);
 };
 
 const processNextScoreReportJob = async () => {
@@ -528,19 +564,32 @@ export const processScoreReportJobsOnce = async () => {
   }
 };
 
+const getScoreReportWorkerRetryDelayMs = (failureCount: number) =>
+  Math.min(1000 * 2 ** Math.max(0, failureCount - 1), 30_000);
+
 let scoreReportWorkerStarted = false;
 
 export const startScoreReportWorker = async () => {
   if (scoreReportWorkerStarted) return;
   scoreReportWorkerStarted = true;
+  let consecutivePollFailures = 0;
 
   const run = async () => {
+    let retryDelayMs = 1000;
+    logContext.function = 'startScoreReportWorker';
     try {
       await processScoreReportJobsOnce();
+      consecutivePollFailures = 0;
     } catch (error) {
-      logger.error(logContext, 'Score report worker poll failed', { error });
+      consecutivePollFailures += 1;
+      retryDelayMs = getScoreReportWorkerRetryDelayMs(consecutivePollFailures);
+      logger.error(logContext, 'Score report worker poll failed; retry scheduled', {
+        error,
+        consecutiveFailures: consecutivePollFailures,
+        retryDelayMs,
+      });
     } finally {
-      setTimeout(run, 1000).unref();
+      setTimeout(run, retryDelayMs).unref();
     }
   };
 
@@ -614,3 +663,6 @@ export const generateScoreReportPdf = async (id: string, preparedForName = '') =
   }
   return buildPdfBuffer(report, preparedForName);
 };
+
+export const _getScoreReportWorkerRetryDelayMsForTest = getScoreReportWorkerRetryDelayMs;
+
