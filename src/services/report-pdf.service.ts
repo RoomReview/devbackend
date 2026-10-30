@@ -52,7 +52,11 @@ const printStyles = `
 `;
 
 export const renderAreaReportPdf = async (report: AreaReportPdfRequest): Promise<Buffer> => {
-  const html = safeHtml(report.html);
+  const htmlWithoutClientAttribution = report.html.replace(
+    /<a\b(?=[^>]*\bhref=["']https:\/\/roomreview\.co\.uk\/?["'])[^>]*>\s*Powered by RoomReview\s*<\/a>/gi,
+    '',
+  );
+  const html = safeHtml(htmlWithoutClientAttribution);
   const css = safeCss(report.css);
   let browser: Browser;
   try {
@@ -91,7 +95,7 @@ export const renderAreaReportPdf = async (report: AreaReportPdfRequest): Promise
       await route.abort();
     });
     await page.setContent(
-      `<!doctype html><html><head><meta charset="utf-8"><style>${css}\n${printStyles}</style></head><body><div class="buyer-report-page">${html}</div></body></html>`,
+      `<!doctype html><html><head><meta charset="utf-8"><style>${css}\n${printStyles}</style></head><body><div class="buyer-report-page">${html}<footer style="break-inside: avoid; page-break-inside: avoid; margin: 16px auto 0; padding: 12px 0; border-top: 1px solid #cbd5e1; color: #334155; text-align: center; font: 600 12px Arial, sans-serif;"><a href="https://roomreview.co.uk" style="color: inherit; text-decoration: underline;">Powered by RoomReview</a></footer></div></body></html>`,
       { waitUntil: 'load', timeout: 20_000 },
     );
     return await page.pdf({
@@ -110,3 +114,4 @@ export const renderAreaReportPdf = async (report: AreaReportPdfRequest): Promise
     await browser.close();
   }
 };
+
