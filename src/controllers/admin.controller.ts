@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import type { ApiResponse, AuthenticatedRequest } from '@/types';
-import { getAdminOverview, getAdminUsers, setUserActive } from '@/repositories/admin.repository';
+import { getAdminAuditLogs, getAdminOverview, getAdminUsers, setUserActive } from '@/repositories/admin.repository';
 import { ModerateReviewDto } from '@/dto/review.dto';
 import {
   deleteReview as deleteReviewService,
@@ -30,6 +30,19 @@ export const getUsers = async (_req: AuthenticatedRequest, res: Response): Promi
     statusCode: 200,
     data,
     message: 'Administrative users fetched successfully',
+  };
+  res.status(200).json(response);
+};
+
+export const getAuditLogs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const requestedLimit = Number(req.query.limit) || 50;
+  const limit = Math.min(Math.max(Math.floor(requestedLimit), 1), 100);
+  const data = await getAdminAuditLogs(limit);
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 200,
+    data,
+    message: 'Administrative audit log fetched successfully',
   };
   res.status(200).json(response);
 };
