@@ -26,12 +26,13 @@ export const createSpacesObjectUrlSigner = (settings: SpacesSignerConfig) => {
   const hasCredentials = Boolean(settings.accessKeyId && settings.secretAccessKey);
   const client = hasCredentials
     ? new S3Client({
-        region: settings.region,
+      region: settings.region,
         endpoint: resolveSpacesOriginEndpoint(settings.region, settings.endpoint),
         credentials: {
           accessKeyId: settings.accessKeyId,
           secretAccessKey: settings.secretAccessKey,
         },
+        requestChecksumCalculation: 'WHEN_REQUIRED',
         responseChecksumValidation: 'WHEN_REQUIRED',
       })
     : null;
