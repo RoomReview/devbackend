@@ -8,40 +8,42 @@ datasource db {
 }
 
 model User {
-  userId           String             @id @default(uuid(7)) @map("user_id") @db.Uuid
-  email            String             @unique
-  firstName        String             @map("first_name")
-  lastName         String             @map("last_name")
-  phone            String?
-  avatar           String?
-  bio              String?
-  passwordHash     String?            @map("password_hash")
-  isEmailVerified  Boolean            @default(false) @map("is_email_verified")
-  emailOnReviewApproved Boolean       @default(true) @map("email_on_review_approved")
-  emailOnReviewRejected Boolean       @default(true) @map("email_on_review_rejected")
-  isActive         Boolean            @default(true) @map("is_active")
-  role             UserRole           @default(TENANT)
-  verifyCodeHash   String?            @map("verify_code_hash")
-  verifiedAt       DateTime?          @map("verified_at")
-  verifyCodeExpiry DateTime?          @map("verify_code_expiry")
-  googleId         String?            @unique @map("google_id")
-  facebookId       String?            @unique @map("facebook_id")
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
-  experiences      experiences[]
-  properties       properties[]
-  reviews          reviews[]
-  saved_properties saved_properties[]
-  savedSearches   SavedSearch[]
-  sessions         Session?
-  ssoLoginCodes    SsoLoginCode[]
-  agencies         UserAgency[]
-  user_credits     user_credits?
-  scoreReports     ScoreReport[]
-  reportOrders     ReportOrder[]
-  billingSubscription BillingSubscription?
-  trialStartedAt   DateTime?          @map("trial_started_at")
-  trialEndsAt      DateTime?          @map("trial_ends_at")
+  userId                      String               @id @default(uuid(7)) @map("user_id") @db.Uuid
+  email                       String               @unique
+  firstName                   String               @map("first_name")
+  lastName                    String               @map("last_name")
+  phone                       String?
+  avatar                      String?
+  bio                         String?
+  passwordHash                String?              @map("password_hash")
+  isEmailVerified             Boolean              @default(false) @map("is_email_verified")
+  emailOnReviewApproved       Boolean              @default(true) @map("email_on_review_approved")
+  emailOnReviewRejected       Boolean              @default(true) @map("email_on_review_rejected")
+  isActive                    Boolean              @default(true) @map("is_active")
+  role                        UserRole             @default(TENANT)
+  verifyCodeHash              String?              @map("verify_code_hash")
+  verifiedAt                  DateTime?            @map("verified_at")
+  verifyCodeExpiry            DateTime?            @map("verify_code_expiry")
+  googleId                    String?              @unique @map("google_id")
+  facebookId                  String?              @unique @map("facebook_id")
+  createdAt                   DateTime             @default(now()) @map("created_at")
+  updatedAt                   DateTime             @updatedAt @map("updated_at")
+  experiences                 experiences[]
+  properties                  properties[]
+  reviews                     reviews[]
+  saved_properties            saved_properties[]
+  savedSearches               SavedSearch[]
+  sessions                    Session?
+  ssoLoginCodes               SsoLoginCode[]
+  agencies                    UserAgency[]
+  ownedAgency                 Agency?
+  user_credits                user_credits?
+  scoreReports                ScoreReport[]
+  reportOrders                ReportOrder[]
+  billingSubscription         BillingSubscription?
+  trialStartedAt              DateTime?            @map("trial_started_at")
+  trialEndsAt                 DateTime?            @map("trial_ends_at")
+  earlyAccessDiscountEligible Boolean              @default(false) @map("early_access_discount_eligible")
 
   @@index([email])
   @@index([role])
@@ -59,6 +61,26 @@ model AnalyticsEvent {
   @@index([anonymousId])
   @@index([eventName, createdAt])
   @@map("analytics_events")
+}
+
+model AdminAuditLog {
+  auditLogId  String   @id @default(uuid(7)) @map("audit_log_id") @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  actorEmail  String   @map("actor_email")
+  action      String
+  resource    String
+  resourceId  String?  @map("resource_id")
+  details     Json?
+  method      String
+  path        String
+  statusCode  Int?     @map("status_code")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("admin_audit_logs")
 }
 
 model Session {
@@ -88,18 +110,35 @@ model SsoLoginCode {
 }
 
 model Agency {
-  agencyId    String       @id @default(uuid(7)) @map("agency_id") @db.Uuid
+  agencyId    String             @id @default(uuid(7)) @map("agency_id") @db.Uuid
+  ownerUserId String?            @unique @map("owner_user_id") @db.Uuid
   name        String
   description String?
-  email       String?      @unique
+  email       String?            @unique
   phone       String?
   website     String?
-  isVerified  Boolean      @default(false) @map("is_verified")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  isVerified  Boolean            @default(false) @map("is_verified")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  owner       User?              @relation(fields: [ownerUserId], references: [userId], onDelete: Cascade)
   users       UserAgency[]
+  invitations AgencyInvitation[]
 
   @@map("agencies")
+}
+
+model AgencyInvitation {
+  agencyInvitationId String    @id @default(uuid(7)) @map("agency_invitation_id") @db.Uuid
+  agencyId           String    @map("agency_id") @db.Uuid
+  email              String
+  tokenHash          String    @unique @map("token_hash") @db.Char(64)
+  expiresAt          DateTime  @map("expires_at")
+  acceptedAt         DateTime? @map("accepted_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  agency             Agency    @relation(fields: [agencyId], references: [agencyId], onDelete: Cascade)
+
+  @@index([agencyId, email, acceptedAt])
+  @@map("agency_invitations")
 }
 
 model UserAgency {
@@ -117,40 +156,40 @@ model UserAgency {
 }
 
 model Borough {
-  boroughId   String     @id @default(uuid(7)) @map("borough_id")
-  name        String     @unique
-  slug        String     @unique
-  description String?
-  image       String?
-  latitude    Float?
-  longitude   Float?
-  metrics     Json       @default("{}")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-  postcodes   Postcode[]
+  boroughId    String        @id @default(uuid(7)) @map("borough_id")
+  name         String        @unique
+  slug         String        @unique
+  description  String?
+  image        String?
+  latitude     Float?
+  longitude    Float?
+  metrics      Json          @default("{}")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  postcodes    Postcode[]
   scoreReports ScoreReport[]
-  reviews     reviews[]
+  reviews      reviews[]
 
   @@index([slug])
   @@map("boroughs")
 }
 
 model Postcode {
-  postcodeId  String        @id @default(uuid(7)) @map("postcode_id")
-  code        String        @unique
-  outcode     String
-  incode      String
-  latitude    Float?
-  longitude   Float?
-  imageUrl    String?       @map("image_url")
-  metrics     Json          @default("{}")
-  boroughId   String?       @map("borough_id")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  experiences experiences[]
-  borough     Borough?      @relation(fields: [boroughId], references: [boroughId])
-  properties  properties[]
-  reviews     reviews[]
+  postcodeId   String        @id @default(uuid(7)) @map("postcode_id")
+  code         String        @unique
+  outcode      String
+  incode       String
+  latitude     Float?
+  longitude    Float?
+  imageUrl     String?       @map("image_url")
+  metrics      Json          @default("{}")
+  boroughId    String?       @map("borough_id")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  experiences  experiences[]
+  borough      Borough?      @relation(fields: [boroughId], references: [boroughId])
+  properties   properties[]
+  reviews      reviews[]
   scoreReports ScoreReport[]
 
   @@index([boroughId])
@@ -167,26 +206,26 @@ enum ScoreStatus {
 }
 
 model ScoreReport {
-  scoreReportId String        @id @default(uuid(7)) @map("score_report_id")
-  userId        String?       @map("user_id") @db.Uuid
-  boroughId     String?       @map("borough_id")
-  postcodeId    String?       @map("postcode_id")
-  name          String?
-  description   String?
-  status        ScoreStatus   @default(WAITING)
-  overallScore  Float?
-  boroughScore  Float?
-  postcodeScore Float?
+  scoreReportId  String      @id @default(uuid(7)) @map("score_report_id")
+  userId         String?     @map("user_id") @db.Uuid
+  boroughId      String?     @map("borough_id")
+  postcodeId     String?     @map("postcode_id")
+  name           String?
+  description    String?
+  status         ScoreStatus @default(WAITING)
+  overallScore   Float?
+  boroughScore   Float?
+  postcodeScore  Float?
   scoreBreakdown Json?
-  reportData    Json?
-  failureReason String?
-  deletedAt     DateTime?     @map("deleted_at")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  reportData     Json?
+  failureReason  String?
+  deletedAt      DateTime?   @map("deleted_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
-  borough      Borough?   @relation(fields: [boroughId], references: [boroughId])
-  postcode     Postcode?  @relation(fields: [postcodeId], references: [postcodeId])
-  user         User?      @relation(fields: [userId], references: [userId], onDelete: SetNull)
+  borough      Borough?      @relation(fields: [boroughId], references: [boroughId])
+  postcode     Postcode?     @relation(fields: [postcodeId], references: [postcodeId])
+  user         User?         @relation(fields: [userId], references: [userId], onDelete: SetNull)
   reportOrders ReportOrder[]
 
   @@map("score_reports")
@@ -237,16 +276,18 @@ enum BillingSubscriptionStatus {
 }
 
 model BillingSubscription {
-  billingSubscriptionId String                   @id @default(uuid(7)) @map("billing_subscription_id") @db.Uuid
-  userId                String                   @unique @map("user_id") @db.Uuid
-  stripeCustomerId      String?                  @map("stripe_customer_id")
-  stripeSubscriptionId  String                   @unique @map("stripe_subscription_id")
+  billingSubscriptionId String                    @id @default(uuid(7)) @map("billing_subscription_id") @db.Uuid
+  userId                String                    @unique @map("user_id") @db.Uuid
+  stripeCustomerId      String?                   @map("stripe_customer_id")
+  stripeSubscriptionId  String                    @unique @map("stripe_subscription_id")
   status                BillingSubscriptionStatus
-  currentPeriodEnd      DateTime?                @map("current_period_end")
-  cancelAtPeriodEnd     Boolean                  @default(false) @map("cancel_at_period_end")
-  createdAt             DateTime                 @default(now()) @map("created_at")
-  updatedAt             DateTime                 @updatedAt @map("updated_at")
-  user                  User                     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  planId                String?                   @map("plan_id")
+  seatLimit             Int                       @default(0) @map("seat_limit")
+  currentPeriodEnd      DateTime?                 @map("current_period_end")
+  cancelAtPeriodEnd     Boolean                   @default(false) @map("cancel_at_period_end")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+  user                  User                      @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("billing_subscriptions")
 }
@@ -442,13 +483,13 @@ model newsletter_subscribers {
 }
 
 model newsletter_article_deliveries {
-  article_id  String   @id
-  title       String
-  summary     String
-  url         String
-  status      String   @default("PROCESSING")
-  queued_at   DateTime @default(now())
-  sent_at     DateTime?
+  article_id String    @id
+  title      String
+  summary    String
+  url        String
+  status     String    @default("PROCESSING")
+  queued_at  DateTime  @default(now())
+  sent_at    DateTime?
 }
 
 model properties {
