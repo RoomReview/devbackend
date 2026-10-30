@@ -4,6 +4,7 @@ import * as blogPostController from '@controllers/blog-post.controller';
 const router = Router();
 
 router.get('/', blogPostController.getAllBlogPosts);
+router.get('/slug/:slug', blogPostController.getBlogPostBySlug);
 router.get('/:id', blogPostController.getBlogPostById);
 router.post('/', blogPostController.createBlogPost);
 router.put('/:id', blogPostController.updateBlogPost);
