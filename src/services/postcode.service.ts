@@ -3,6 +3,7 @@ import {
   findPostcodeById,
   findPostcodeByCode,
   findAllPostcodes,
+  findPostcodesByIds,
   countPostcodes,
   updatePostcode,
   deletePostcode,
@@ -17,6 +18,22 @@ import { getPostcodeDataByCode } from '@/services/postcode-data.service';
 import prisma from '@config/database';
 
 const districtCodePattern = /^E\d{8}$/i;
+const sortedPostcodeOrderCacheTtl = 5 * 60_000;
+
+export type PostcodeSort =
+  | 'alphabetical-asc'
+  | 'alphabetical-desc'
+  | 'crime-asc'
+  | 'crime-desc'
+  | 'price-asc'
+  | 'price-desc'
+  | 'rating-desc';
+
+let sortedPostcodeOrderCache: {
+  key: string;
+  expiresAt: number;
+  postcodeIds: string[];
+} | null = null;
 
 const resolveBoroughId = async (boroughReference: string | undefined) => {
   if (!boroughReference) return undefined;
@@ -38,25 +55,64 @@ const resolveBoroughId = async (boroughReference: string | undefined) => {
   return (await findBoroughByName(boroughName))?.boroughId;
 };
 
-export const getAllPostcodes = async (page: number, limit: number, filter?: FindPostcodesFilter) => {
+export const getAllPostcodes = async (
+  page: number,
+  limit: number,
+  filter?: FindPostcodesFilter,
+  sortBy?: PostcodeSort,
+) => {
   const { offset } = paginate(page, limit);
-  const [postcodes, total] = await Promise.all([
-    findAllPostcodes(limit, offset, filter),
-    countPostcodes(filter),
-  ]);
-  if (postcodes.length === 0) return buildPaginatedResult(postcodes, total, page, limit);
+  const total = await countPostcodes(filter);
+  const requiresComputedSort = sortBy !== undefined
+    && sortBy !== 'alphabetical-asc'
+    && sortBy !== 'alphabetical-desc';
+  const sortCacheKey = requiresComputedSort ? JSON.stringify({ sortBy, filter }) : null;
+  const cachedPostcodeIds = sortCacheKey
+    && sortedPostcodeOrderCache?.key === sortCacheKey
+    && sortedPostcodeOrderCache.expiresAt > Date.now()
+    ? sortedPostcodeOrderCache.postcodeIds
+    : null;
+  const pagePostcodeIds = cachedPostcodeIds?.slice(offset, offset + limit);
+  const isBuildingSortedOrder = Boolean(requiresComputedSort && !cachedPostcodeIds);
+  const postcodes = cachedPostcodeIds
+    ? await findPostcodesByIds(pagePostcodeIds ?? [], filter)
+    : await findAllPostcodes(
+      isBuildingSortedOrder ? total : limit,
+      isBuildingSortedOrder ? 0 : offset,
+      filter,
+      undefined,
+      sortBy === 'alphabetical-desc' ? 'desc' : 'asc',
+    );
+
+  if (cachedPostcodeIds && pagePostcodeIds) {
+    const pageOrder = new Map(pagePostcodeIds.map((postcodeId, index) => [postcodeId, index]));
+    postcodes.sort((left, right) => (pageOrder.get(left.postcodeId) ?? 0) - (pageOrder.get(right.postcodeId) ?? 0));
+  }
+
+  if (postcodes.length === 0) {
+    if (isBuildingSortedOrder && sortCacheKey) {
+      sortedPostcodeOrderCache = {
+        key: sortCacheKey,
+        expiresAt: Date.now() + sortedPostcodeOrderCacheTtl,
+        postcodeIds: [],
+      };
+    }
+    return buildPaginatedResult(postcodes, total, page, limit);
+  }
 
   const postcodeIds = postcodes.map(({ postcodeId }) => postcodeId);
   const propertyCodeCandidates = [...new Set(postcodes.flatMap(({ code }) => getPostcodeLookupCandidates(code)))];
   const [reviews, propertyValues, housingPrices, crimeRates] = await Promise.all([
     prisma.reviews.groupBy({
       by: ['postcode_id'],
-      where: { postcode_id: { in: postcodeIds }, status: 'APPROVED' },
+      where: isBuildingSortedOrder
+        ? { status: 'APPROVED' }
+        : { postcode_id: { in: postcodeIds }, status: 'APPROVED' },
       _avg: { overall_rating: true },
       _count: { _all: true },
     }),
     prisma.property_value_data.findMany({
-      where: { postcode: { in: propertyCodeCandidates } },
+      ...(isBuildingSortedOrder ? {} : { where: { postcode: { in: propertyCodeCandidates } } }),
       orderBy: { date: 'desc' },
       select: { postcode: true, value: true, date: true },
     }),
@@ -153,35 +209,73 @@ export const getAllPostcodes = async (page: number, limit: number, filter?: Find
       }] as const]
     : []));
 
-  const result = buildPaginatedResult(postcodes, total, page, limit);
-  return {
-    ...result,
-    data: postcodes.map((postcode) => {
-      const boroughName = postcode.borough?.name ?? null;
-      const normalizedCode = normalizePostcodeCode(postcode.code);
-      const postcodePrice = priceByPostcode.get(normalizedCode);
-      const boroughPrice = boroughName ? priceByBorough.get(normalizeBoroughName(boroughName)) : undefined;
-      const crime = boroughName ? crimeByBorough.get(normalizeBoroughName(boroughName)) : undefined;
-      const review = reviewByPostcode.get(postcode.postcodeId);
-      return {
-        ...postcode,
-        boroughName,
-        averagePrice: postcodePrice?.averagePrice ?? boroughPrice?.averagePrice ?? null,
-        priceSource: postcodePrice?.averagePrice !== null && postcodePrice?.averagePrice !== undefined
-          ? 'postcode' as const
-          : boroughPrice?.averagePrice !== null && boroughPrice?.averagePrice !== undefined
-            ? 'borough' as const
-            : null,
-        priceGrowthPct: postcodePrice?.averagePrice !== null && postcodePrice?.averagePrice !== undefined
-          ? postcodePrice.growthPct
-          : boroughPrice?.growthPct ?? null,
-        crimeRatePer1000: crime?.rate ?? null,
-        londonAverageCrimeRatePer1000: crime?.londonAverage ?? null,
-        averageRating: review?.averageRating ?? null,
-        reviewCount: review?.reviewCount ?? 0,
-      };
-    }),
+  const enrichedPostcodes = postcodes.map((postcode) => {
+    const boroughName = postcode.borough?.name ?? null;
+    const normalizedCode = normalizePostcodeCode(postcode.code);
+    const postcodePrice = priceByPostcode.get(normalizedCode);
+    const boroughPrice = boroughName ? priceByBorough.get(normalizeBoroughName(boroughName)) : undefined;
+    const crime = boroughName ? crimeByBorough.get(normalizeBoroughName(boroughName)) : undefined;
+    const review = reviewByPostcode.get(postcode.postcodeId);
+    return {
+      ...postcode,
+      boroughName,
+      averagePrice: postcodePrice?.averagePrice ?? boroughPrice?.averagePrice ?? null,
+      priceSource: postcodePrice?.averagePrice !== null && postcodePrice?.averagePrice !== undefined
+        ? 'postcode' as const
+        : boroughPrice?.averagePrice !== null && boroughPrice?.averagePrice !== undefined
+          ? 'borough' as const
+          : null,
+      priceGrowthPct: postcodePrice?.averagePrice !== null && postcodePrice?.averagePrice !== undefined
+        ? postcodePrice.growthPct
+        : boroughPrice?.growthPct ?? null,
+      crimeRatePer1000: crime?.rate ?? null,
+      londonAverageCrimeRatePer1000: crime?.londonAverage ?? null,
+      averageRating: review?.averageRating ?? null,
+      reviewCount: review?.reviewCount ?? 0,
+    };
+  });
+
+  if (!requiresComputedSort || cachedPostcodeIds) {
+    return buildPaginatedResult(enrichedPostcodes, total, page, limit);
+  }
+
+  const compareNullable = (left: number | null, right: number | null, direction: number) =>
+    left === null ? (right === null ? 0 : 1) : right === null ? -1 : (left - right) * direction;
+  const comparePostcodeAreas = (
+    left: typeof enrichedPostcodes[number],
+    right: typeof enrichedPostcodes[number],
+  ) => {
+    const leftArea = left.outcode.match(/^[A-Z]{1,2}/i)?.[0] ?? '';
+    const rightArea = right.outcode.match(/^[A-Z]{1,2}/i)?.[0] ?? '';
+    return leftArea.localeCompare(rightArea) || left.code.localeCompare(right.code);
   };
+
+  const sortedPostcodes = enrichedPostcodes.sort((left, right) => {
+    switch (sortBy) {
+      case 'crime-asc':
+        return compareNullable(left.crimeRatePer1000, right.crimeRatePer1000, 1) || left.code.localeCompare(right.code);
+      case 'crime-desc':
+        return compareNullable(left.crimeRatePer1000, right.crimeRatePer1000, -1) || left.code.localeCompare(right.code);
+      case 'price-asc':
+        return compareNullable(left.averagePrice, right.averagePrice, 1) || left.code.localeCompare(right.code);
+      case 'price-desc':
+        return compareNullable(left.averagePrice, right.averagePrice, -1) || left.code.localeCompare(right.code);
+      case 'rating-desc':
+        return compareNullable(left.averageRating, right.averageRating, -1) || left.code.localeCompare(right.code);
+      default:
+        return comparePostcodeAreas(left, right);
+    }
+  });
+
+  if (sortCacheKey) {
+    sortedPostcodeOrderCache = {
+      key: sortCacheKey,
+      expiresAt: Date.now() + sortedPostcodeOrderCacheTtl,
+      postcodeIds: sortedPostcodes.map(({ postcodeId }) => postcodeId),
+    };
+  }
+
+  return buildPaginatedResult(sortedPostcodes.slice(offset, offset + limit), total, page, limit);
 };
 
 export const getPostcodeById = async (id: string) => {
@@ -230,7 +324,7 @@ export const createNewPostcode = async (data: CreatePostcodeDto) => {
       });
   }
 
-  return await createPostcode({
+  const postcode = await createPostcode({
     code: normalizedCode,
     outcode: data.outcode.toUpperCase().trim(),
     incode: data.incode.toUpperCase().trim(),
@@ -239,6 +333,8 @@ export const createNewPostcode = async (data: CreatePostcodeDto) => {
     metrics: data.metrics || {},
     ...(boroughId ? { borough: { connect: { boroughId } } } : {}),
   });
+  sortedPostcodeOrderCache = null;
+  return postcode;
 };
 
 export const updatePostcodeById = async (id: string, data: UpdatePostcodeDto) => {
@@ -263,7 +359,7 @@ export const updatePostcodeById = async (id: string, data: UpdatePostcodeDto) =>
       });
   }
 
-  return await updatePostcode(id, {
+  const postcode = await updatePostcode(id, {
     code: data.code ? normalizePostcodeCode(data.code) : undefined,
     outcode: data.outcode ? data.outcode.toUpperCase().trim() : undefined,
     incode: data.incode ? data.incode.toUpperCase().trim() : undefined,
@@ -272,9 +368,13 @@ export const updatePostcodeById = async (id: string, data: UpdatePostcodeDto) =>
     metrics: data.metrics,
     ...(boroughId ? { borough: { connect: { boroughId } } } : {}),
   });
+  sortedPostcodeOrderCache = null;
+  return postcode;
 };
 
 export const deletePostcodeById = async (id: string) => {
   await getPostcodeById(id);
-  return await deletePostcode(id);
+  const postcode = await deletePostcode(id);
+  sortedPostcodeOrderCache = null;
+  return postcode;
 };
