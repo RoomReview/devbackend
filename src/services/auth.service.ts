@@ -9,7 +9,6 @@ import {
   getUserSensitiveByEmail,
   updateUserPasswordAndClearCode,
   registerUser as createUserAccount,
-  registerEarlyAccessUser as createEarlyAccessUserAccount,
 } from './user.service';
 import { comparePassword, hashPassword } from '../utils/password';
 import {
@@ -46,6 +45,7 @@ import {
   findUserByFacebookId,
   findUserById,
   createSsoUser,
+  linkGoogleIdToUser,
 } from '@/repositories/users.repository';
 import {
   consumeSsoLoginCode,
@@ -53,7 +53,7 @@ import {
 } from '@/repositories/sso-login-codes.repository';
 import { sendResetPasswordEmail, sendVerificationEmail } from '@/utils/email';
 import config from '@/config';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { isDisposableEmail } from '@/utils/disposable-email';
 
 const logContext: LogContext = {
@@ -61,7 +61,10 @@ const logContext: LogContext = {
   function: '',
 };
 
-export const registerUser = async (data: RegisterUserDto) => {
+export const registerUser = async (
+  data: RegisterUserDto,
+  options: { earlyAccessRegistration?: boolean } = {},
+) => {
   logContext.function = 'registerUser';
   const existingUser = await findUserByEmail(data.email);
   if (existingUser) {
@@ -75,12 +78,18 @@ export const registerUser = async (data: RegisterUserDto) => {
 
   const token = generateVerificationCode();
 
+  const user = await createUserAccount(data, hashedPassword, {
+    expiresAt: token.expiresAt,
+    hashedCode: token.hashedCode,
+  }, options);
+
   let emailSent = false;
   try {
     await sendVerificationEmail(
       data.email,
       token.code,
       `${data.firstName} ${data.lastName}`,
+      data.inviteToken,
     );
     emailSent = true;
   } catch (error) {
@@ -89,11 +98,6 @@ export const registerUser = async (data: RegisterUserDto) => {
       error,
     });
   }
-
-  const user = await createUserAccount(data, hashedPassword, {
-    expiresAt: token.expiresAt,
-    hashedCode: token.hashedCode,
-  });
 
   const { passwordHash, verifyCodeHash, ...userWithoutSensitive } = user;
 
@@ -121,73 +125,17 @@ export const registerEarlyAccessUser = async (data: EarlyAccessRegisterDto) => {
     });
   }
 
-  if (await findUserByEmail(normalizedData.email)) {
-    throw new ValidationError({
-      message: 'This email address is already taken',
-      code: 'VALIDATION_ERROR',
-    });
-  }
-
-  const passwordHash = await hashPassword(normalizedData.password);
-  const verification = generateVerificationCode();
-  const userId = randomUUID();
-
-  let account: Awaited<ReturnType<typeof createEarlyAccessUserAccount>>;
-  try {
-    account = await createEarlyAccessUserAccount(
-      userId,
-      {
-        email: normalizedData.email,
-        firstName: normalizedData.firstName,
-        lastName: normalizedData.lastName,
-      },
-      passwordHash,
-      verification,
-    );
-  } catch (error) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === 'P2002'
-    ) {
-      throw new ValidationError({
-        message: 'This email address is already taken',
-        code: 'VALIDATION_ERROR',
-      });
-    }
-    throw error;
-  }
-  const { user, trialEndsAt } = account;
-
-  let emailSent = false;
-  try {
-    await sendVerificationEmail(
-      user.email,
-      verification.code,
-      `${user.firstName} ${user.lastName}`,
-    );
-    emailSent = true;
-  } catch (error) {
-    logger.warn(logContext, 'Early access verification email could not be sent', {
-      email: user.email,
-      error,
-    });
-  }
+  const registration = await registerUser({
+    ...normalizedData,
+    role: normalizedData.role,
+    agencyName: normalizedData.agencyName,
+    agencyPhone: normalizedData.agencyPhone,
+  }, { earlyAccessRegistration: true });
+  const { user, emailSent } = registration;
 
   return {
-    user: {
-      userId: user.userId,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      isActive: user.isActive,
-      isEmailVerified: user.isEmailVerified,
-      trialStartedAt: user.trialStartedAt,
-      trialEndsAt: user.trialEndsAt,
-    },
-    trialEndsAt,
+    user,
+    trialEndsAt: user.trialEndsAt,
     emailSent,
   };
 };
@@ -490,8 +438,9 @@ export interface SsoProfile {
  * Logs in an existing user or registers a new one via an SSO provider.
  * Lookup order:
  *   1. Find by provider-specific ID (googleId / facebookId)
- *   2. Reject email matches not already linked to this provider
- *   3. Create a brand-new SSO-only user
+ *   2. Link a Google identity to an account with the same verified email
+ *   3. Reject unverified email matches from other providers
+ *   4. Create a brand-new SSO-only user
  * In all cases a JWT session is upserted and returned.
  */
 export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
@@ -506,21 +455,41 @@ export const loginOrRegisterSsoUser = async (profile: SsoProfile) => {
 
   let user = byId;
   if (!user) {
-    const existingEmail = await findUserByEmail(email, { userId: true });
+    const existingEmail = await findUserByEmail(email, {
+      userId: true,
+      googleId: true,
+      isActive: true,
+    });
     if (existingEmail) {
-      throw new ValidationError({
-        message: 'An account with this email already exists. Please sign in with your existing account.',
-        code: 'VALIDATION_ERROR',
+      if (provider !== 'google') {
+        throw new ValidationError({
+          message: 'An account with this email already exists. Please sign in with your existing account.',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+      if (!existingEmail.isActive) {
+        throw new ValidationError({
+          message: 'Account is deactivated',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+      if (existingEmail.googleId && existingEmail.googleId !== id) {
+        throw new ValidationError({
+          message: 'This account is already linked to a different Google account.',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      user = await linkGoogleIdToUser(existingEmail.userId, id);
+    } else {
+      user = await createSsoUser({
+        email,
+        firstName,
+        lastName,
+        googleId: provider === 'google' ? id : undefined,
+        facebookId: provider === 'facebook' ? id : undefined,
       });
     }
-
-    user = await createSsoUser({
-      email,
-      firstName,
-      lastName,
-      googleId: provider === 'google' ? id : undefined,
-      facebookId: provider === 'facebook' ? id : undefined,
-    });
   }
 
   if (!user.isActive) {
