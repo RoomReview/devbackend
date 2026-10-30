@@ -3,16 +3,20 @@ import config from '@config/index';
 import { findReportOrderForReport, findReportOrderBySession, createReportOrder, setStripeSession, markOrderPaid, markOrderFailed, markOrderCancelled, listReportOrders, claimWebhookEvent, completeWebhookEvent, failWebhookEvent } from '@/repositories/report-order.repository';
 import { findScoreReportOwner } from '@/repositories/score-report.repository';
 import {
+  findBillingSubscription,
   findBillingSubscriptionByStripeId,
   getBillingStatus,
+  hasReportCreditConsumption,
   grantSubscriptionCredits,
-  consumeReportCredit,
+  consumeEarlyAccessDiscount,
   saveBillingSubscription,
   updateBillingSubscription,
 } from '@/repositories/billing.repository';
 import { enqueueScoreReportGeneration } from '@/services/score-report.service';
 import { EntityNotFoundError, InternalServerError, UnauthorizedError, ValidationError } from '@/utils/custom-error';
 import logger, { LogContext } from '@/utils/logger';
+import { findUserById } from '@/repositories/users.repository';
+import { sendSubscriptionInvoiceEmail } from '@/utils/email';
 
 const logContext: LogContext = { service: 'payment.service', function: 'handleWebhook' };
 
@@ -30,6 +34,8 @@ type StripeCheckoutSession = {
 
 type StripePaymentIntent = { id: string };
 
+type StripeCoupon = { id: string; valid: boolean };
+
 type StripeSubscription = {
   id: string;
   status: string;
@@ -41,6 +47,11 @@ type StripeSubscription = {
 
 type StripeInvoice = {
   id: string;
+  number?: string | null;
+  amount_paid?: number;
+  currency?: string;
+  hosted_invoice_url?: string | null;
+  invoice_pdf?: string | null;
   subscription?: string | null;
   parent?: {
     subscription_details?: {
@@ -58,7 +69,7 @@ const mapSubscriptionStatus = (status: string) => {
   return 'INCOMPLETE' as const;
 };
 
-const stripeRequest = async (path: string, body: URLSearchParams) => {
+const stripeRequest = async <T = StripeCheckoutSession>(path: string, body: URLSearchParams): Promise<T> => {
   if (!config.stripeSecretKey) {
     throw new InternalServerError({ message: 'Stripe is not configured', code: 'INTERNAL_SERVER_ERROR' });
   }
@@ -70,14 +81,16 @@ const stripeRequest = async (path: string, body: URLSearchParams) => {
     },
     body,
   });
-  const data = await response.json() as StripeCheckoutSession & { error?: { message?: string } };
+  const data = await response.json() as T & { error?: { message?: string } };
   if (!response.ok) {
     throw new InternalServerError({ message: data.error?.message ?? 'Stripe request failed', code: 'INTERNAL_SERVER_ERROR' });
   }
   return data;
 };
 
-const stripeGet = async <T>(path: string): Promise<T> => {
+function stripeGet<T>(path: string): Promise<T>;
+function stripeGet<T>(path: string, allowNotFound: true): Promise<T | null>;
+async function stripeGet<T>(path: string, allowNotFound = false): Promise<T | null> {
   if (!config.stripeSecretKey) {
     throw new InternalServerError({ message: 'Stripe is not configured', code: 'INTERNAL_SERVER_ERROR' });
   }
@@ -85,11 +98,43 @@ const stripeGet = async <T>(path: string): Promise<T> => {
     headers: { Authorization: `Bearer ${config.stripeSecretKey}` },
   });
   const data = await response.json() as T & { error?: { message?: string } };
+  if (allowNotFound && response.status === 404) {
+    return null;
+  }
   if (!response.ok) {
     throw new InternalServerError({ message: data.error?.message ?? 'Stripe request failed', code: 'INTERNAL_SERVER_ERROR' });
   }
   return data;
-};
+}
+
+const getOrCreateEarlyAccessCoupon = async (userId: string): Promise<StripeCoupon> => {
+  const couponId = `roomreview_early_access_${userId.replaceAll('-', '')}`;
+  const existingCoupon = await stripeGet<StripeCoupon>(`coupons/${encodeURIComponent(couponId)}`, true);
+  if (existingCoupon) {
+    if (!existingCoupon.valid) {
+      throw new ValidationError({ message: 'Your early access discount has already been used', code: 'VALIDATION_ERROR' });
+    }
+    return existingCoupon;
+  }
+
+  const form = new URLSearchParams({
+    id: couponId,
+    name: 'Early Access - 50% off first month',
+    percent_off: '50',
+    duration: 'once',
+    max_redemptions: '1',
+    'metadata[userId]': userId,
+  });
+  try {
+    return await stripeRequest<StripeCoupon>('coupons', form);
+  } catch (error) {
+    const couponAfterRace = await stripeGet<StripeCoupon>(`coupons/${encodeURIComponent(couponId)}`, true);
+    if (couponAfterRace?.valid) {
+      return couponAfterRace;
+    }
+    throw error;
+  }
+}
 
 export const createCheckout = async (scoreReportId: string, userId: string) => {
   const owner = await findScoreReportOwner(scoreReportId);
@@ -126,9 +171,9 @@ export const createCheckout = async (scoreReportId: string, userId: string) => {
 };
 
 const pricingPlans = {
-  individual: { name: 'Individual Agent', seats: 1, amount: 3500 },
-  'small-team': { name: 'Small Team', seats: 5, amount: 14900 },
-  branch: { name: 'Branch', seats: 10, amount: 24900 },
+  individual: { name: 'Individual Agent', seats: 1, amount: 3500, monthlyReports: 20 },
+  'small-team': { name: 'Small Team', seats: 5, amount: 14900, monthlyReports: 60 },
+  branch: { name: 'Branch', seats: 10, amount: 24900, monthlyReports: 110 },
 } as const;
 
 export type PricingPlanId = keyof typeof pricingPlans;
@@ -136,11 +181,54 @@ export type PricingPlanId = keyof typeof pricingPlans;
 const isPricingPlanId = (value: string): value is PricingPlanId =>
   Object.prototype.hasOwnProperty.call(pricingPlans, value);
 
+const subscriptionPlanMetadata = (metadata?: Record<string, string>) => {
+  const planId = metadata?.planId;
+  const seats = Number(metadata?.seats);
+  if (!planId || !isPricingPlanId(planId) || seats !== pricingPlans[planId].seats) {
+    return { planId: null, seatLimit: 0 };
+  }
+  return { planId, seatLimit: pricingPlans[planId].seats };
+};
+
+const subscriptionMonthlyReports = (metadata?: Record<string, string>) => {
+  const plan = metadata?.planId;
+  if (plan && isPricingPlanId(plan)) {
+    return pricingPlans[plan].monthlyReports;
+  }
+  const legacyCredits = Number(metadata?.credits);
+  return Number.isInteger(legacyCredits) && legacyCredits > 0
+    ? legacyCredits
+    : config.stripeSubscriptionCredits;
+};
+
+export const getPlanMonthlyReportAllowance = (planId: PricingPlanId) =>
+  pricingPlans[planId].monthlyReports;
+
+export const ensureSubscriptionSeatLimit = async (userId: string) => {
+  const subscription = await findBillingSubscription(userId);
+  if (!subscription || subscription.status !== 'ACTIVE' || subscription.seatLimit > 0) {
+    return subscription;
+  }
+  const stripeSubscription = await stripeGet<StripeSubscription>(
+    `subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+  );
+  const seatDetails = subscriptionPlanMetadata(stripeSubscription.metadata);
+  if (seatDetails.seatLimit === 0) {
+    return subscription;
+  }
+  await updateBillingSubscription(subscription.stripeSubscriptionId, {
+    status: subscription.status,
+    ...seatDetails,
+  });
+  return findBillingSubscriptionByStripeId(subscription.stripeSubscriptionId);
+};
+
 export const createSubscriptionCheckout = async (userId: string, planId?: string) => {
-  const selectedPlan = planId !== undefined && isPricingPlanId(planId)
-    ? { id: planId, ...pricingPlans[planId] }
+  const resolvedPlanId = planId ?? 'individual';
+  const selectedPlan = isPricingPlanId(resolvedPlanId)
+    ? { id: resolvedPlanId, ...pricingPlans[resolvedPlanId] }
     : null;
-  if (planId !== undefined && !selectedPlan) {
+  if (!selectedPlan) {
     throw new ValidationError({ message: 'Choose a valid subscription plan', code: 'VALIDATION_ERROR' });
   }
 
@@ -151,6 +239,9 @@ export const createSubscriptionCheckout = async (userId: string, planId?: string
   if (billing.subscription?.status === 'ACTIVE') {
     return { checkoutUrl: null, subscription: billing.subscription };
   }
+  const earlyAccessCoupon = billing.earlyAccessDiscountEligible
+    ? await getOrCreateEarlyAccessCoupon(userId)
+    : null;
 
   const form = new URLSearchParams({
     mode: 'subscription',
@@ -158,9 +249,16 @@ export const createSubscriptionCheckout = async (userId: string, planId?: string
     cancel_url: config.stripeCancelUrl,
     'line_items[0][quantity]': '1',
     'subscription_data[metadata][userId]': userId,
-    'subscription_data[metadata][credits]': String(config.stripeSubscriptionCredits),
+    'subscription_data[metadata][credits]': String(
+      selectedPlan?.monthlyReports ?? config.stripeSubscriptionCredits,
+    ),
     'metadata[userId]': userId,
   });
+  if (earlyAccessCoupon) {
+    form.set('subscription_data[metadata][earlyAccessDiscount]', 'true');
+    form.set('metadata[earlyAccessDiscount]', 'true');
+    form.set('discounts[0][coupon]', earlyAccessCoupon.id);
+  }
   if (selectedPlan) {
     form.set('subscription_data[metadata][planId]', selectedPlan.id);
     form.set('subscription_data[metadata][seats]', String(selectedPlan.seats));
@@ -170,7 +268,7 @@ export const createSubscriptionCheckout = async (userId: string, planId?: string
     form.set('line_items[0][price_data][recurring][interval]', 'month');
     form.set(
       'line_items[0][price_data][product_data][name]',
-      `RoomReview - ${selectedPlan.name} (${selectedPlan.seats} ${selectedPlan.seats === 1 ? 'user' : 'users'})`,
+      `RoomReview - ${selectedPlan.name} (${selectedPlan.monthlyReports} shared reports per month; ${selectedPlan.seats} invited team ${selectedPlan.seats === 1 ? 'member' : 'members'} plus account owner)`,
     );
   } else if (config.stripeSubscriptionPriceId) {
     form.set('line_items[0][price]', config.stripeSubscriptionPriceId);
@@ -241,6 +339,7 @@ const processWebhookEvent = async (event: { id: string; type: string; data: { ob
     const subscription = event.data.object as unknown as StripeSubscription;
     await updateBillingSubscription(subscription.id, {
       status: mapSubscriptionStatus(subscription.status),
+      ...subscriptionPlanMetadata(subscription.metadata),
       currentPeriodEnd: toDate(subscription.current_period_end),
       cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
     });
@@ -259,36 +358,85 @@ const processWebhookEvent = async (event: { id: string; type: string; data: { ob
     const subscriptionId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
     if (!subscriptionId) return { handled: false };
     let subscription = await findBillingSubscriptionByStripeId(subscriptionId);
+    const stripeSubscription = !subscription || !subscription.planId
+      ? await stripeGet<StripeSubscription>(`subscriptions/${subscriptionId}`)
+      : null;
     if (!subscription) {
-      const stripeSubscription = await stripeGet<StripeSubscription>(`subscriptions/${subscriptionId}`);
+      if (!stripeSubscription) {
+        throw new InternalServerError({ message: 'Unable to retrieve subscription details for paid invoice', code: 'INTERNAL_SERVER_ERROR' });
+      }
       const userId = stripeSubscription.metadata?.userId;
       if (!userId) return { handled: false };
+      if (stripeSubscription.metadata?.earlyAccessDiscount === 'true') {
+        await consumeEarlyAccessDiscount(userId);
+      }
       subscription = await saveBillingSubscription({
         userId,
         stripeCustomerId: stripeSubscription.customer ?? null,
         stripeSubscriptionId: stripeSubscription.id,
         status: mapSubscriptionStatus(stripeSubscription.status),
+        ...subscriptionPlanMetadata(stripeSubscription.metadata),
         currentPeriodEnd: toDate(stripeSubscription.current_period_end),
         cancelAtPeriodEnd: Boolean(stripeSubscription.cancel_at_period_end),
       });
+    } else if (stripeSubscription) {
+      const planData = subscriptionPlanMetadata(stripeSubscription.metadata);
+      if (planData.seatLimit > 0) {
+        await updateBillingSubscription(subscriptionId, {
+          status: subscription.status,
+          ...planData,
+        });
+        subscription = await findBillingSubscriptionByStripeId(subscriptionId);
+      }
     }
     const granted = await grantSubscriptionCredits({
       userId: subscription.userId,
       eventId: event.id,
       invoiceId: invoice.id,
-      credits: config.stripeSubscriptionCredits,
+      credits: stripeSubscription
+        ? subscriptionMonthlyReports(stripeSubscription.metadata)
+        : subscription.seatLimit > 0
+          ? (subscription.seatLimit + 1) * 10
+          : config.stripeSubscriptionCredits,
     });
+    const user = await findUserById(subscription.userId, {
+      email: true,
+      firstName: true,
+      lastName: true,
+    });
+    if (!user?.email || invoice.amount_paid === undefined || !invoice.currency) {
+      throw new InternalServerError({
+        message: 'Unable to send subscription invoice: customer or invoice details are missing',
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    await sendSubscriptionInvoiceEmail(
+      user.email,
+      [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+      {
+        number: invoice.number ?? null,
+        amountPaid: invoice.amount_paid,
+        currency: invoice.currency,
+        hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+        invoicePdf: invoice.invoice_pdf ?? null,
+      },
+    );
     logger.info(logContext, 'Stripe invoice processed', { eventId: event.id, invoiceId: invoice.id, subscriptionId, creditsGranted: granted });
-    return { handled: granted };
+    return { handled: true };
   }
   if (event.type !== 'checkout.session.completed' && event.type !== 'checkout.session.async_payment_succeeded') return { handled: false };
   const session = event.data.object;
   if (session.mode === 'subscription' && session.subscription && session.metadata?.userId) {
+    const stripeSubscription = await stripeGet<StripeSubscription>(`subscriptions/${session.subscription}`);
+    if (session.metadata.earlyAccessDiscount === 'true') {
+      await consumeEarlyAccessDiscount(session.metadata.userId);
+    }
     await saveBillingSubscription({
       userId: session.metadata.userId,
       stripeCustomerId: session.customer ?? null,
       stripeSubscriptionId: session.subscription,
       status: 'ACTIVE',
+      ...subscriptionPlanMetadata(stripeSubscription.metadata),
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
     });
@@ -334,7 +482,11 @@ export const assertPaidReportAccess = async (scoreReportId: string, userId: stri
   await assertReportOwner(scoreReportId, userId);
   const order = await findReportOrderForReport(scoreReportId, userId);
   if (order?.status === 'PAID') return order;
-  if (await consumeReportCredit(userId, scoreReportId)) {
+  if (await hasReportCreditConsumption(scoreReportId)) {
+    return { status: 'PAID' as const, scoreReportId, userId };
+  }
+  const billing = await getBillingStatus(userId);
+  if (billing.creditsBalance > 0) {
     return { status: 'PAID' as const, scoreReportId, userId };
   }
   throw new UnauthorizedError({ message: 'A paid order or available report credit is required to access this report' });
