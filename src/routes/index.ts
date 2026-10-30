@@ -29,8 +29,10 @@ import votingDataRoutes from './voting-data.routes';
 import postcodeDataRoutes from './postcode-data.routes';
 import scoreReportRoutes from './score-report.routes';
 import analyticsRoutes from './analytics.routes.js';
+import seoRoutes from './seo.routes';
 import paymentRoutes from './payment.routes';
 import adminRoutes from './admin.routes';
+import teamRoutes from './team.routes';
 import { errorHandler, notFoundHandler } from '@middleware/error.middleware';
 
 const router = Router();
@@ -65,8 +67,10 @@ router.use('/data/voting', votingDataRoutes);
 router.use('/data/postcode', postcodeDataRoutes);
 router.use('/score-reports', scoreReportRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/team', teamRoutes);
 router.use('/admin', adminRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/seo', seoRoutes);
 router.use(notFoundHandler);
 router.use(errorHandler);
 
