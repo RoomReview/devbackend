@@ -288,6 +288,44 @@ export const getBlogPostById = async (
   }
 };
 
+export const getBlogPostBySlug = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const routeSlug = req.params.slug;
+  const slug = Array.isArray(routeSlug) ? routeSlug[0] ?? '' : routeSlug;
+  if (!/^[a-z0-9-]+$/i.test(slug)) {
+    res.status(400).json({ success: false, statusCode: 400, error: 'Invalid blog post slug' });
+    return;
+  }
+
+  const url = new URL(`${WORDPRESS_API}/posts`);
+  url.searchParams.set('slug', slug);
+  url.searchParams.set('_embed', '1');
+
+  try {
+    const { data } = await fetchWordPressJson<WordPressEmbeddedPost[]>(url);
+    const post = data[0];
+    if (!post) {
+      res.status(404).json({ success: false, statusCode: 404, error: 'Blog post not found' });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      data: mapWordPressPost(post),
+      message: 'Blog post fetched successfully',
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unable to load blog post from WordPress';
+    const statusCode = error instanceof WordPressApiError ? error.statusCode : 502;
+    res.status(statusCode).json({ success: false, statusCode, error: message });
+  }
+};
+
 export const createBlogPost = (
   _req: Request,
   res: Response,
