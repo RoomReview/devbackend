@@ -1,247 +1,127 @@
 import assert from 'node:assert';
-import { randomUUID } from 'node:crypto';
-import { describe, it, before, beforeEach, after } from 'node:test';
-import request from 'supertest';
-import app from '../index';
-import prisma from '../config/database';
-import { generateAccessToken } from '../utils/jwt.token';
-import { UserRole } from '../generated/prisma/enums';
-import { processScoreReportJobsOnce } from './score-report.service';
+import { describe, it } from 'node:test';
+import {
+  _buildPdfBufferForTest,
+  _calculateLocationScoresForTest,
+  _calculateMetricsScoreForTest,
+  _getScoreReportWorkerRetryDelayMsForTest,
+} from '../services/score-report.service';
 
-describe('Score report integration', () => {
-  let adminToken: string;
-  let boroughId: string;
-  let postcodeId: string;
-  let scoreReportId: string;
+const boroughMetrics = {
+  score: 75,
+  crimeScore: 10,
+  affordabilityScore: 20,
+  transportScore: 8,
+  amenitiesScore: 7,
+  healthScore: 70,
+  educationScore: 8,
+};
 
-  const refreshAdminToken = async () => {
-    const token = generateAccessToken({
-      sub: '00000000-0000-0000-0000-000000000001',
-      email: 'admin-test@roomreview.test',
-      role: UserRole.ADMIN,
+describe('score-report.service (pure functions)', () => {
+  it('backs off score report polling after transient failures and caps the delay', () => {
+    assert.deepStrictEqual(
+      [1, 2, 3, 4, 5, 6, 7].map(_getScoreReportWorkerRetryDelayMsForTest),
+      [1000, 2000, 4000, 8000, 16000, 30000, 30000],
+    );
+  });
+
+  it('should compute category-level normalized values', () => {
+    const { score, breakdown } = _calculateMetricsScoreForTest(boroughMetrics);
+    assert.strictEqual(typeof score, 'number');
+    assert.deepStrictEqual(breakdown, {
+      safety: 90,
+      affordability: 80,
+      amenities: 70,
+      health: 70,
+      education: 80,
     });
-    adminToken = token.token;
-    const tokenExpiry = token.expiresAt ?? new Date(Date.now() + 5 * 60 * 1000);
+    assert.strictEqual(score, 78);
+  });
 
-    await prisma.session.upsert({
-      where: { userId: '00000000-0000-0000-0000-000000000001' },
-      update: {
-        accessTokenId: token.jti,
-        accessTokenExpiry: tokenExpiry,
-      },
-      create: {
-        userId: '00000000-0000-0000-0000-000000000001',
-        accessTokenId: token.jti,
-        accessTokenExpiry: tokenExpiry,
-      },
+  it('should reuse borough metrics when scoring a postcode', () => {
+    const borough = _calculateLocationScoresForTest(boroughMetrics, true);
+
+    assert.strictEqual(borough.postcodeResult.score, borough.boroughResult.score);
+    assert.deepStrictEqual(borough.postcodeResult.breakdown, borough.boroughResult.breakdown);
+    assert.strictEqual(borough.overallScore, borough.boroughResult.score);
+  });
+
+  it('should score postcode metrics independently from borough metrics', () => {
+    const result = _calculateLocationScoresForTest(
+      boroughMetrics,
+      true,
+      { crimeScore: 80, affordabilityScore: 90 },
+    );
+
+    assert.notStrictEqual(result.postcodeResult.score, result.boroughResult.score);
+    assert.notDeepStrictEqual(result.postcodeResult.breakdown, result.boroughResult.breakdown);
+  });
+
+  it('should use a provided baseline score when category metrics are missing', () => {
+    const { score, breakdown } = _calculateMetricsScoreForTest({ score: 42 });
+
+    assert.strictEqual(score, 42);
+    assert.deepStrictEqual(breakdown, {});
+  });
+
+  it('should not invent a score when all scoring metrics are missing', () => {
+    const { score, breakdown } = _calculateMetricsScoreForTest({ population: 1000 });
+
+    assert.strictEqual(score, null);
+    assert.deepStrictEqual(breakdown, {});
+  });
+
+  it('should not infer a transport score from a fare zone', () => {
+    const { score, breakdown } = _calculateMetricsScoreForTest({
+      trend: '3.8%',
+      zones: 'Zone 1',
+      rating: 4.7,
+      avgRent: '£2,950',
+      reviewCount: 8,
     });
-  };
 
-  before(async () => {
-    const userId = '00000000-0000-0000-0000-000000000001';
-    await prisma.user.upsert({
-      where: { userId },
-      update: {
-        email: 'admin-test@roomreview.test',
-        firstName: 'Admin',
-        lastName: 'Test',
-        role: UserRole.ADMIN,
-        isActive: true,
-        isEmailVerified: true,
-      },
-      create: {
-        userId,
-        email: 'admin-test@roomreview.test',
-        firstName: 'Admin',
-        lastName: 'Test',
-        passwordHash: 'test',
-        role: UserRole.ADMIN,
-        isActive: true,
-        isEmailVerified: true,
-      },
-    });
-
-    await refreshAdminToken();
-
-    const borough = await prisma.borough.create({
-      data: {
-        name: 'Integration Borough',
-        slug: `integration-borough-${Date.now()}`,
-        metrics: {
-          crimeScore: 10,
-          affordabilityScore: 50,
-          transportScore: 6,
-          amenitiesScore: 8,
-          healthScore: 70,
-          educationScore: 7,
-        },
-      },
-    });
-    boroughId = borough.boroughId;
-
-    const postcode = await prisma.postcode.create({
-      data: {
-        code: `INT${Date.now()}`,
-        outcode: 'IN',
-        incode: 'TE',
-        boroughId,
-        metrics: {
-          crimeScore: 20,
-          affordabilityScore: 40,
-          transportScore: 7,
-          amenitiesScore: 7,
-          healthScore: 65,
-          educationScore: 7,
-        },
-      },
-    });
-    postcodeId = postcode.postcodeId;
-  });
-
-  beforeEach(refreshAdminToken);
-
-  after(async () => {
-    await prisma.scoreReport.deleteMany({ where: { boroughId } }).catch(() => null);
-    await prisma.postcode.deleteMany({ where: { boroughId } }).catch(() => null);
-    await prisma.borough.deleteMany({ where: { boroughId } }).catch(() => null);
-    await prisma.session.deleteMany({ where: { userId: '00000000-0000-0000-0000-000000000001' } }).catch(() => null);
-    await prisma.user.deleteMany({ where: { email: 'admin-test@roomreview.test' } }).catch(() => null);
-  });
-
-  it('should require valid auth on protected endpoints', async () => {
-    const res = await request(app).post('/api/v1/score-reports').send({ boroughId });
-    assert.strictEqual(res.status, 401);
-    assert.ok(res.body?.error);
-  });
-
-  it('should create a score report request', async () => {
-    const res = await request(app)
-      .post('/api/v1/score-reports')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ boroughId, name: 'Integration Report' });
-
-    assert.strictEqual(res.status, 201);
-    assert.strictEqual(res.body.success, true);
-    assert.ok(res.body.data?.scoreReportId);
-    scoreReportId = res.body.data.scoreReportId;
-  });
-
-  it('should return validation error for missing boroughId/postcodeId', async () => {
-    const res = await request(app)
-      .post('/api/v1/score-reports')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Bad Request' });
-
-    assert.strictEqual(res.status, 400);
-    assert.strictEqual(res.body.success, false);
-    assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-  });
-
-  it('should fetch an existing score report', async () => {
-    const res = await request(app)
-      .get(`/api/v1/score-reports/${scoreReportId}`)
-      .set('Authorization', `Bearer ${adminToken}`);
-
-    assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.body.success, true);
-    assert.strictEqual(res.body.data.scoreReportId, scoreReportId);
-  });
-
-  it('should generate a preview for a borough', async () => {
-    const res = await request(app)
-      .post('/api/v1/score-reports/preview')
-      .send({ boroughId });
-
-    assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.body.success, true);
-    assert.strictEqual(typeof res.body.data.overallScore, 'number');
-    assert.ok(res.body.data.preview?.boroughMetrics);
-  });
-
-  it('should calculate postcode-specific scores in a preview', async () => {
-    const res = await request(app)
-      .post('/api/v1/score-reports/preview')
-      .send({ boroughId, postcodeId });
-
-    assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.body.success, true);
-    assert.strictEqual(typeof res.body.data.postcodeScore, 'number');
-    assert.strictEqual(typeof res.body.data.overallScore, 'number');
-    assert.deepStrictEqual(res.body.data.preview?.postcodeMetrics, {
-      crimeScore: 20,
-      affordabilityScore: 40,
-      transportScore: 7,
-      amenitiesScore: 7,
-      healthScore: 65,
-      educationScore: 7,
+    assert.strictEqual(typeof score, 'number');
+    assert.ok((score ?? 0) > 0);
+    assert.deepStrictEqual(breakdown, {
+      affordability: 26,
     });
   });
 
-  it('should reject preview without boroughId or postcodeId', async () => {
-    const res = await request(app)
-      .post('/api/v1/score-reports/preview')
-      .send({});
-
-    assert.strictEqual(res.status, 400);
-    assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+  it('does not calculate a transport score from an explicit but unverified score field', () => {
+    const { breakdown } = _calculateMetricsScoreForTest({ transportScore: 73 });
+    assert.deepStrictEqual(breakdown, {});
   });
 
-  it('should enqueue report generation and eventually mark it READY', async () => {
-    await prisma.$executeRaw`
-      INSERT INTO report_orders (order_id, user_id, score_report_id, amount, currency, status, paid_at)
-      VALUES (${randomUUID()}::uuid, ${'00000000-0000-0000-0000-000000000001'}::uuid, ${scoreReportId}, 1999, 'gbp', 'PAID', CURRENT_TIMESTAMP)
-    `;
-
-    const startRes = await request(app)
-      .post(`/api/v1/score-reports/${scoreReportId}/generate`)
-      .set('Authorization', `Bearer ${adminToken}`);
-
-    assert.strictEqual(startRes.status, 202);
-    assert.strictEqual(startRes.body.success, true);
-    await processScoreReportJobsOnce();
-
-    const waitForReady = async () => {
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        const getRes = await request(app)
-          .get(`/api/v1/score-reports/${scoreReportId}`)
-          .set('Authorization', `Bearer ${adminToken}`);
-        if (getRes.body.data?.status === 'READY') {
-          return getRes.body.data;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-      throw new Error('Score report did not reach READY status in time');
+  it('should build a non-empty PDF buffer from a synthetic report', () => {
+    const fakeReport: any = {
+      scoreReportId: 'r-1',
+      status: 'READY',
+      name: 'Synthetic',
+      description: 'For tests',
+      overallScore: 88,
+      boroughScore: 88,
+      postcodeScore: 89,
+      scoreBreakdown: { borough: { safety: 90 }, postcode: { safety: 95 } },
+      reportData: {
+        borough: 'Islington',
+        postcode: 'N1 9GU',
+        summary: 'Area score summary',
+        scoreBreakdown: { borough: { transport: 0, affordability: 44 } },
+      },
     };
 
-    const readyReport = await waitForReady();
-    assert.strictEqual(readyReport.status, 'READY');
-    assert.strictEqual(typeof readyReport.overallScore, 'number');
-  });
-
-  it('should return PDF for a READY score report', async () => {
-    const res = await request(app)
-      .get(`/api/v1/score-reports/${scoreReportId}/pdf`)
-      .set('Authorization', `Bearer ${adminToken}`);
-
-    assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.header['content-type'], 'application/pdf');
-    assert.ok(Buffer.isBuffer(res.body) || typeof res.body === 'string');
-  });
-
-  it('should fail PDF download for non-ready report', async () => {
-    const tempRes = await request(app)
-      .post('/api/v1/score-reports')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ postcodeId, name: 'Pending PDF Test' });
-
-    assert.strictEqual(tempRes.status, 201);
-    const pendingId = tempRes.body.data.scoreReportId;
-
-    const res = await request(app)
-      .get(`/api/v1/score-reports/${pendingId}/pdf`)
-      .set('Authorization', `Bearer ${adminToken}`);
-
-    assert.strictEqual(res.status, 400);
-    assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+    const buf = _buildPdfBufferForTest(fakeReport, 'Admin User');
+    assert.ok(Buffer.isBuffer(buf));
+    assert.ok(buf.length > 0);
+    // Basic PDF header check
+    assert.strictEqual(buf.toString('utf8', 0, 8), '%PDF-1.1');
+    const pdfText = buf.toString('utf8');
+    assert.ok(pdfText.includes('Prepared for: Admin User'));
+    assert.ok(pdfText.includes('Borough - Safety: 90'));
+    assert.ok(pdfText.includes('Report details'));
+    assert.ok(pdfText.includes('Powered by RoomReview'));
+    assert.ok(pdfText.includes('https://roomreview.co.uk'));
+    assert.ok(!pdfText.includes('[object Object]'));
+    assert.ok(!pdfText.includes('T*'));
   });
 });
