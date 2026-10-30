@@ -46,6 +46,7 @@ export const sendVerificationEmail = async (
   toEmail: string,
   code: string,
   name: string,
+  teamInviteToken?: string,
 ) => {
   if (!toEmail) {
     throw new Error('toEmail is not defined');
@@ -63,6 +64,9 @@ export const sendVerificationEmail = async (
   const verificationUrl = new URL('/verify-email', verificationBaseUrl);
   verificationUrl.searchParams.set('email', toEmail);
   verificationUrl.searchParams.set('code', code);
+  if (teamInviteToken) {
+    verificationUrl.searchParams.set('teamInviteToken', teamInviteToken);
+  }
   if (
     config.nodeEnv === 'production' &&
     verificationUrl.protocol !== 'https:'
@@ -105,6 +109,41 @@ export const sendVerificationEmail = async (
   await sendEmail(data);
 };
 
+export const sendAgencyInvitationEmail = async (
+  toEmail: string,
+  inviterName: string,
+  agencyName: string,
+  invitationToken: string,
+) => {
+  if (!toEmail || !inviterName || !agencyName || !invitationToken) {
+    throw new Error('All agency invitation details are required');
+  }
+  const invitationUrl = new URL('/team-invite', config.frontendUrl);
+  invitationUrl.searchParams.set('token', invitationToken);
+  if (config.nodeEnv === 'production' && invitationUrl.protocol !== 'https:') {
+    throw new Error('Agency invitation links must use HTTPS in production');
+  }
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  const safeInviterName = escapeHtml(inviterName);
+  const safeAgencyName = escapeHtml(agencyName);
+  const safeInvitationUrl = escapeHtml(invitationUrl.toString());
+  await sendEmail({
+    from: { email: config.emailFrom, name: 'RoomReview' },
+    subject: `Join ${agencyName} on RoomReview`,
+    text: `${inviterName} has invited you to join ${agencyName} on RoomReview. Accept the invitation: ${invitationUrl}`,
+    html: `<p>Hi,</p><p>${safeInviterName} has invited you to join <strong>${safeAgencyName}</strong> on RoomReview.</p><p><a href="${safeInvitationUrl}">Accept invitation</a></p>`,
+    categories: ['agency-invitation'],
+    personalizations: [{ to: { email: toEmail } }],
+    mailSettings: { sandboxMode: { enable: config.sendGridSandboxMode } },
+  });
+};
+
 export const sendResetPasswordEmail = async (
   toEmail: string,
   name: string,
@@ -142,6 +181,12 @@ export const sendResetPasswordEmail = async (
         dynamicTemplateData: templateData,
       },
     ],
+    trackingSettings: {
+      clickTracking: {
+        enable: false,
+        enableText: false,
+      },
+    },
     mailSettings: {
       sandboxMode: {
         enable: config.sendGridSandboxMode,
@@ -185,6 +230,72 @@ export const sendReviewModerationEmail = async (
     html: `<p>Hi ${escapeHtml(name)},</p><p>${escapeHtml(outcome)}</p><p><strong>Review:</strong> ${escapeHtml(reviewTitle)}</p><p>RoomReview</p>`,
     categories: ['review-moderation'],
     mailSettings: { sandboxMode: { enable: config.sendGridSandboxMode } },
+  });
+};
+
+export const sendSubscriptionInvoiceEmail = async (
+  toEmail: string,
+  name: string,
+  invoice: {
+    number: string | null;
+    amountPaid: number;
+    currency: string;
+    hostedInvoiceUrl: string | null;
+    invoicePdf: string | null;
+  },
+) => {
+  if (!toEmail || !name) {
+    throw new Error('Invoice recipient email and name are required');
+  }
+  if (!Number.isFinite(invoice.amountPaid) || invoice.amountPaid < 0) {
+    throw new Error('Invoice amount must be a non-negative number');
+  }
+  if (!/^[a-z]{3}$/i.test(invoice.currency)) {
+    throw new Error('Invoice currency must be a valid ISO currency code');
+  }
+
+  const amount = new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: invoice.currency.toUpperCase(),
+  }).format(invoice.amountPaid / 100);
+  const invoiceNumber = invoice.number ?? 'Subscription invoice';
+  const invoiceUrl = invoice.hostedInvoiceUrl ?? invoice.invoicePdf;
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  await sendEmail({
+    to: toEmail,
+    from: { email: config.emailFrom, name: 'RoomReview' },
+    subject: `Your RoomReview subscription invoice ${invoiceNumber}`,
+    text: [
+      `Hi ${name},`,
+      '',
+      `Your RoomReview subscription payment of ${amount} has been received.`,
+      `Invoice: ${invoiceNumber}`,
+      ...(invoiceUrl ? [`View or download your invoice: ${invoiceUrl}`] : []),
+      '',
+      'Thank you for choosing RoomReview.',
+    ].join('\n'),
+    html: [
+      `<p>Hi ${escapeHtml(name)},</p>`,
+      `<p>Your RoomReview subscription payment of <strong>${escapeHtml(amount)}</strong> has been received.</p>`,
+      `<p>Invoice: ${escapeHtml(invoiceNumber)}</p>`,
+      ...(invoiceUrl
+        ? [`<p><a href="${escapeHtml(invoiceUrl)}">View or download your invoice</a></p>`]
+        : []),
+      '<p>Thank you for choosing RoomReview.</p>',
+    ].join(''),
+    categories: ['subscription-invoice'],
+    mailSettings: {
+      sandboxMode: {
+        enable: config.sendGridSandboxMode,
+      },
+    },
   });
 };
 
