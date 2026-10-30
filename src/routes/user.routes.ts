@@ -7,6 +7,7 @@ import {
 } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { ChangePasswordDto, UpdateEmailPreferencesDto } from '@/dto/user.dto';
+import { auditAdminAction } from '@/middleware/admin-audit.middleware';
 
 /**
  * @swagger
@@ -74,6 +75,7 @@ router.get(
   '/',
   authenticate,
   authorize('view:users:all'),
+  auditAdminAction,
   userController.getAllUsers,
 );
 
@@ -94,7 +96,7 @@ router.get(
  *       200:
  *         description: User found
  */
-router.get('/:id', authenticate, authorize('view:users:all'), userController.getUserById);
+router.get('/:id', authenticate, authorize('view:users:all'), auditAdminAction, userController.getUserById);
 
 /**
  * @swagger
@@ -106,7 +108,7 @@ router.get('/:id', authenticate, authorize('view:users:all'), userController.get
  *       201:
  *         description: User created successfully
  */
-router.post('/', authenticate, authorize('manage:users'), userController.createUser);
+router.post('/', authenticate, authorize('manage:users'), auditAdminAction, userController.createUser);
 
 /**
  * @swagger
@@ -125,7 +127,7 @@ router.post('/', authenticate, authorize('manage:users'), userController.createU
  *       200:
  *         description: User updated successfully
  */
-router.put('/:id', authenticate, authorize('manage:users'), userController.updateUser);
+router.put('/:id', authenticate, authorize('manage:users'), auditAdminAction, userController.updateUser);
 
 /**
  * @swagger
@@ -144,7 +146,7 @@ router.put('/:id', authenticate, authorize('manage:users'), userController.updat
  *       200:
  *         description: User deleted successfully
  */
-router.delete('/:id', authenticate, authorize('manage:users'), userController.deleteUser);
+router.delete('/:id', authenticate, authorize('manage:users'), auditAdminAction, userController.deleteUser);
 
 /**
  * @swagger
