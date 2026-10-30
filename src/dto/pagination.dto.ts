@@ -1,4 +1,4 @@
-import { object, number, preprocess, type infer as _infer } from 'zod';
+import { object, number, preprocess, enum as zEnum, type infer as _infer } from 'zod';
 
 export const PaginationQueryDto = object({
   page: preprocess(
@@ -12,6 +12,18 @@ export const PaginationQueryDto = object({
 }).passthrough();
 
 export type PaginationQueryDto = _infer<typeof PaginationQueryDto>;
+
+export const PostcodeListQueryDto = PaginationQueryDto.extend({
+  sortBy: zEnum([
+    'alphabetical-asc',
+    'alphabetical-desc',
+    'crime-asc',
+    'crime-desc',
+    'price-asc',
+    'price-desc',
+    'rating-desc',
+  ]).optional(),
+});
 
 export const OptionalPaginationQueryDto = object({
   page: preprocess(
