@@ -28,14 +28,10 @@ import { authenticate } from '@/middleware/auth.middleware';
  *   schemas:
  *     EarlyAccessRegisterDto:
  *       type: object
- *       required: [firstName, lastName, email, password]
+ *       required: [firstName, lastName, email, password, role, agencyName, agencyPhone]
  *       properties:
  *         firstName:
- *            type: string
- minLength: 64
- maxLength: 64
- pattern: '^[a-f0-9]{64}$'
- description: Single-use, high-entropy password-reset token.
+ *           type: string
  *         lastName:
  *           type: string
  *         email:
@@ -44,6 +40,16 @@ import { authenticate } from '@/middleware/auth.middleware';
  *         password:
  *           type: string
  *           minLength: 8
+ *         role:
+ *           type: string
+ *           enum: [AGENCY, AGENT]
+ *         agencyName:
+ *           type: string
+ *           maxLength: 150
+ *           description: Required for AGENCY and AGENT roles.
+ *         agencyPhone:
+ *           type: string
+ *           maxLength: 50
  *     RegisterUserDto:
  *       type: object
  *       required:
@@ -68,14 +74,19 @@ import { authenticate } from '@/middleware/auth.middleware';
  *           enum: [LANDLORD, TENANT, AGENCY, AGENT]
  *         agencyName:
  *           type: string
+ *           maxLength: 150
  *         agencyDescription:
  *           type: string
  *         agencyEmail:
  *           type: string
  *         agencyPhone:
  *           type: string
+ *           maxLength: 50
  *         agencyWebsite:
  *           type: string
+ *         inviteToken:
+ *           type: string
+ *           description: Optional one-time invitation token for joining an Agency or Agent team.
  *     LoginUserDto:
  *       type: object
  *       required:
@@ -138,7 +149,7 @@ router.post(
  * @swagger
  * /auth/early-access:
  *   post:
- *     summary: Register for early access with an active 30-day trial
+ *     summary: Register for early access with three reports and 50% off the first paid month
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -148,7 +159,7 @@ router.post(
  *             $ref: '#/components/schemas/EarlyAccessRegisterDto'
  *     responses:
  *       201:
- *         description: Account created with an active session and trial
+ *         description: Account created with three report credits and eligibility for 50% off its first paid subscription month
  *       400:
  *         description: Invalid input or disposable email domain
  */
