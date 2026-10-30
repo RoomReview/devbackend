@@ -11,6 +11,7 @@ import {
 
 export const RegisterUserDto = object({
   email: email({ pattern: regexes.email }),
+  inviteToken: string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
   password: string().min(6),
   firstName: string().min(1),
   lastName: string().min(1),
@@ -20,21 +21,34 @@ export const RegisterUserDto = object({
     UserRole['AGENCY'],
     UserRole['AGENT'],
   ]),
-  agencyName: string().optional(),
+  agencyName: string().max(150).optional(),
   agencyDescription: string().optional(),
   agencyEmail: string().optional(),
-  agencyPhone: string().optional(),
+  agencyPhone: string().max(50).optional(),
   agencyWebsite: string().optional(),
 }).superRefine((data, ctx) => {
-  if (
-    (data.role === UserRole['AGENCY'] || data.role === UserRole['AGENT']) &&
-    (!data.agencyName || data.agencyName.trim().length === 0)
-  ) {
+  if (data.inviteToken && data.role !== UserRole['AGENT']) {
     ctx.addIssue({
       code: 'custom',
-      message: 'Agency name is required for agency or agent role',
-      path: ['agencyName'],
+      message: 'Agency invitations must be accepted with an agent account',
+      path: ['role'],
     });
+  }
+  if (data.role === UserRole['AGENCY'] || data.role === UserRole['AGENT']) {
+    if (!data.inviteToken && (!data.agencyName || data.agencyName.trim().length === 0)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Agency name is required for agency or agent role',
+        path: ['agencyName'],
+      });
+    }
+    if (!data.inviteToken && (!data.agencyPhone || data.agencyPhone.trim().length === 0)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Agency phone is required for agency or agent role',
+        path: ['agencyPhone'],
+      });
+    }
   }
 });
 
@@ -43,6 +57,9 @@ export const EarlyAccessRegisterDto = object({
   lastName: string().trim().min(1),
   email: email({ pattern: regexes.email }),
   password: string().min(8),
+  role: enum_([UserRole['AGENCY'], UserRole['AGENT']]),
+  agencyName: string().trim().min(1).max(150),
+  agencyPhone: string().trim().min(1).max(50),
 });
 
 
