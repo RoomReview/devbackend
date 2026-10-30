@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import type { Request, Response } from 'express';
-import { getAllBlogPosts, getBlogPostById } from './blog-post.controller';
+import { getAllBlogPosts, getBlogPostById, getBlogPostBySlug } from './blog-post.controller';
 
-const createRequest = (query: Record<string, string> = {}, id = '') =>
-  ({ query, params: { id } }) as unknown as Request;
+const createRequest = (
+  query: Record<string, string> = {},
+  id = '',
+  slug = '',
+) => ({ query, params: { id, slug } }) as unknown as Request;
 
 const createResponse = () => {
   const response = {
@@ -151,5 +154,37 @@ describe('blog post controller', () => {
     await getBlogPostById(createRequest({}, 'not-an-id'), response);
 
     assert.equal(response.statusCode, 400);
+  });
+
+  it('fetches a published article by its slug', async (context) => {
+    let requestUrl: URL | undefined;
+    context.mock.method(
+      globalThis,
+      'fetch',
+      async (input: URL | RequestInfo) => {
+        requestUrl = new URL(input.toString());
+        return jsonResponse([{
+          id: 90003,
+          slug: 'slugged-article',
+          date: '2026-10-12T00:00:00',
+          link: 'https://roomreview.co.uk/blog/slugged-article',
+          title: { rendered: 'Slugged article' },
+          excerpt: { rendered: '<p>Summary</p>' },
+          content: { rendered: '<p>Full article content</p>' },
+          author: 10,
+          featured_media: 20,
+          categories: [30],
+          tags: [40],
+        }]);
+      },
+    );
+
+    const response = createResponse();
+    await getBlogPostBySlug(createRequest({}, '', 'slugged-article'), response);
+
+    assert.equal(response.statusCode, 200);
+    assert.equal((response.body as { data: { slug: string } }).data.slug, 'slugged-article');
+    assert.equal(requestUrl?.pathname, '/wp-json/wp/v2/posts');
+    assert.equal(requestUrl?.searchParams.get('slug'), 'slugged-article');
   });
 });
