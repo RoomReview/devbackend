@@ -1,4 +1,4 @@
-import { AgencyCreateInput, UserAgencyUncheckedCreateInput } from '@/generated/prisma/models';
+import { AgencyUncheckedCreateInput, UserAgencyUncheckedCreateInput } from '@/generated/prisma/models';
 import prisma from '@config/database';
 import logger, { LogContext } from '@/utils/logger';
 
@@ -8,7 +8,7 @@ const logContext: LogContext = {
 };
 
 export const createAgency = async (
-  data: AgencyCreateInput,
+  data: AgencyUncheckedCreateInput,
   tx: Omit<
     typeof prisma,
     '$connect' | '$disconnect' | '$on' | '$use' | '$extends' | '$transaction'
