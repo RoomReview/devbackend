@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '@/types';
 import * as postcodeService from '../services/postcode.service';
+import type { PostcodeSort } from '../services/postcode.service';
 import type { CreatePostcodeDto, UpdatePostcodeDto } from '@/dto/postcode.dto';
 
 export const getAllPostcodes = async (
@@ -14,8 +15,9 @@ export const getAllPostcodes = async (
     outcode: req.query.outcode as string,
     boroughId: req.query.boroughId as string,
   };
+  const sortBy = req.query.sortBy as PostcodeSort | undefined;
 
-  const { data, pagination } = await postcodeService.getAllPostcodes(page, limit, filter);
+  const { data, pagination } = await postcodeService.getAllPostcodes(page, limit, filter, sortBy);
 
   const response: ApiResponse<typeof data> = {
     success: true,
