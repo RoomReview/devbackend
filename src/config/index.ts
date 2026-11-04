@@ -75,6 +75,9 @@ export const config = {
     (nodeEnv === 'production'
       ? 'https://roomreview.co.uk'
       : (process.env.FRONTEND_URL ?? 'http://localhost:3000')),
+  wordpressUsername: process.env.WORDPRESS_USERNAME ?? '',
+  wordpressApplicationPassword:
+    process.env.WORDPRESS_APPLICATION_PASSWORD ?? '',
   spaces: {
     bucket: process.env.DO_SPACES_BUCKET ?? '',
     region: process.env.DO_SPACES_REGION ?? 'lon1',
@@ -99,6 +102,8 @@ export const config = {
   ),
   stripeReportAmount: Number(process.env.STRIPE_REPORT_AMOUNT ?? 1999),
   stripeCurrency: process.env.STRIPE_CURRENCY ?? 'gbp',
+  awinApiToken: process.env.AWIN_API_TOKEN ?? '',
+  awinPublisherId: Number(process.env.AWIN_PUBLISHER_ID ?? 0),
   stripeSuccessUrl:
     process.env.STRIPE_SUCCESS_URL ??
     `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
