@@ -1,4 +1,5 @@
 import { permissions } from '@/config/permissions';
+import { canAccessAdminPermission } from '@/config/admin-access';
 import { validateAccessToken } from '@/services/auth.service';
 import type { AuthenticatedRequest } from '@/types';
 import { UnauthorizedError } from '@/utils/custom-error';
@@ -34,14 +35,17 @@ export const authorize = (...pems: (keyof typeof permissions)[]) => {
     next: NextFunction,
   ): void => {
     const { user } = req;
-    const { userId, role } = user || {};
-    if (!user && !userId && !role) {
+    const { userId, role } = user ?? {};
+    if (!userId || !role) {
       throw new UnauthorizedError({ message: 'No user authenticated' });
     }
 
-    const isAllowed = pems.some((each) =>
-      permissions[each].includes(role as any),
-    );
+    const isAllowed = pems.some((each) => {
+      if (role === 'ADMIN') {
+        return canAccessAdminPermission(user?.email ?? '', role, each);
+      }
+      return (permissions[each] as readonly string[]).includes(role);
+    });
     if (!isAllowed) {
       throw new UnauthorizedError({ message: 'Insufficient permissions' });
     }
