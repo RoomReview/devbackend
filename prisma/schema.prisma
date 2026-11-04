@@ -7,6 +7,7 @@ datasource db {
   provider = "postgresql"
 }
 
+// Case-insensitive uniqueness is enforced by a database trigger in migration because Prisma does not model expression indexes.
 model User {
   userId                      String               @id @default(uuid(7)) @map("user_id") @db.Uuid
   email                       String               @unique
@@ -40,10 +41,12 @@ model User {
   user_credits                user_credits?
   scoreReports                ScoreReport[]
   reportOrders                ReportOrder[]
-  billingSubscription         BillingSubscription?
-  trialStartedAt              DateTime?            @map("trial_started_at")
-  trialEndsAt                 DateTime?            @map("trial_ends_at")
+  reviewRewardGrants         ReviewRewardGrant[]
+  billingSubscription        BillingSubscription?
+  trialStartedAt             DateTime?            @map("trial_started_at")
+  trialEndsAt                DateTime?            @map("trial_ends_at")
   earlyAccessDiscountEligible Boolean              @default(false) @map("early_access_discount_eligible")
+  rewardsUnlocked             Boolean              @default(false) @map("rewards_unlocked")
 
   @@index([email])
   @@index([role])
@@ -256,6 +259,66 @@ model ReportOrder {
   @@index([userId, createdAt])
   @@index([scoreReportId])
   @@map("report_orders")
+}
+
+model AffiliateOffer {
+  offerId            String              @id @default(uuid(7)) @map("offer_id") @db.Uuid
+  storeName          String              @map("store_name")
+  advertiserName     String              @map("advertiser_name")
+  logoUrl            String?             @map("logo_url")
+  description        String
+  discountDetails    String?             @map("discount_details")
+  trackingUrl        String              @map("tracking_url")
+  awinApproved       Boolean             @default(false) @map("awin_approved")
+  isActive           Boolean             @default(false) @map("is_active")
+  awinPublisherId    BigInt?             @map("awin_publisher_id")
+  awinPromotionId    BigInt?             @map("awin_promotion_id")
+  awinAdvertiserId   BigInt?             @map("awin_advertiser_id")
+  awinStartsAt       DateTime?           @map("awin_starts_at") @db.Timestamptz(3)
+  awinEndsAt         DateTime?           @map("awin_ends_at") @db.Timestamptz(3)
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  reviewRewardGrants ReviewRewardGrant[]
+
+  @@index([isActive, awinApproved])
+  @@map("affiliate_offers")
+}
+
+model ReviewRewardGrant {
+  rewardGrantId  String         @id @default(uuid(7)) @map("reward_grant_id") @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  reviewId       String?        @unique @map("review_id") @db.Uuid
+  offerId        String?        @map("offer_id") @db.Uuid
+  clickReference String?        @unique @map("click_reference")
+  redeemedAt     DateTime?      @map("redeemed_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  user           User           @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  review         reviews?       @relation(fields: [reviewId], references: [review_id], onDelete: SetNull)
+  offer          AffiliateOffer? @relation(fields: [offerId], references: [offerId], onDelete: Restrict)
+  transactions   AffiliateTransaction[]
+
+  @@index([userId, redeemedAt, createdAt])
+  @@map("review_reward_grants")
+}
+
+model AffiliateTransaction {
+  transactionId  BigInt           @id @map("transaction_id")
+  advertiserId   BigInt            @map("advertiser_id")
+  advertiserName String            @map("advertiser_name")
+  clickReference String?           @map("click_reference")
+  rewardGrantId  String?           @map("reward_grant_id") @db.Uuid
+  status         String
+  commission     Decimal?          @db.Decimal(14, 4)
+  currency       String?            @db.VarChar(3)
+  transactionAt  DateTime          @map("transaction_at")
+  validationAt   DateTime?         @map("validation_at")
+  syncedAt       DateTime          @default(now()) @map("synced_at")
+  rewardGrant    ReviewRewardGrant? @relation(fields: [rewardGrantId], references: [rewardGrantId], onDelete: SetNull)
+
+  @@index([status, transactionAt])
+  @@index([rewardGrantId])
+  @@map("affiliate_transactions")
 }
 
 model PaymentWebhookEvent {
@@ -618,6 +681,8 @@ model reviews {
   status           ReviewStatus @default(PENDING)
   rejection_reason String?
   author_id        String       @db.Uuid
+  author_first_name String
+  author_last_name String
   postcode_id      String?
   borough_id       String?
   created_at       DateTime     @default(now())
@@ -626,6 +691,7 @@ model reviews {
   users            User         @relation(fields: [author_id], references: [userId], onDelete: Cascade)
   boroughs         Borough?     @relation(fields: [borough_id], references: [boroughId])
   postcodes        Postcode?    @relation(fields: [postcode_id], references: [postcodeId])
+  rewardGrant      ReviewRewardGrant?
 
   @@index([author_id])
   @@index([borough_id])
