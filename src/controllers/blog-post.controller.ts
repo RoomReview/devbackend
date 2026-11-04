@@ -1,5 +1,8 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '@/types';
+import { blogPostRepository } from '@/repositories/blog-post.repository';
+import { EntityNotFoundError } from '@/utils/custom-error';
+import logger from '@/utils/logger';
 
 interface WordPressTerm {
   id: number;
@@ -74,8 +77,12 @@ class WordPressApiError extends Error {
 
 const fetchWordPressJson = async <T>(
   url: URL,
+  init?: RequestInit,
 ): Promise<{ response: Awaited<ReturnType<typeof fetch>>; data: T }> => {
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!response.ok) {
     throw new WordPressApiError(
       `WordPress returned ${response.status} for ${url.pathname}`,
@@ -227,6 +234,25 @@ const mapWordPressPost = (post: WordPressEmbeddedPost): BlogPost => ({
     .filter((name): name is string => Boolean(name)),
 });
 
+const mapDatabasePost = (
+  post: NonNullable<
+    Awaited<ReturnType<typeof blogPostRepository.findPublishedBySlug>>
+  >,
+  includeContent = false,
+): BlogPost => ({
+  id: post.blog_post_id,
+  slug: post.slug,
+  date: (post.published_at ?? post.created_at).toISOString(),
+  link: `https://roomreview.co.uk/blog/${post.slug}`,
+  title: post.title,
+  excerpt: post.excerpt,
+  ...(includeContent ? { content: post.content } : {}),
+  author: 'RoomReview Editorial',
+  image: post.featured_image ?? '',
+  categories: post.blog_categories ? [post.blog_categories.name] : [],
+  tags: post.blog_tags.map((tag) => tag.name),
+});
+
 export const getAllBlogPosts = async (
   req: Request,
   res: Response,
@@ -236,22 +262,60 @@ export const getAllBlogPosts = async (
   const requestedPage = Number(req.query.page) || 1;
   const page = Math.max(Math.floor(requestedPage), 1);
 
+  let databasePosts: Awaited<
+    ReturnType<typeof blogPostRepository.findPublished>
+  > = [];
+  let databaseError: unknown;
   try {
-    const result = await getCachedWordPressPosts(page, perPage);
-    res.status(200).json({
-      success: true,
-      statusCode: 200,
-      data: result.data,
-      pagination: result.pagination,
-      message: 'WordPress blog posts fetched successfully',
-    });
+    databasePosts = await blogPostRepository.findPublished();
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Unable to load blog posts from WordPress';
-    res.status(502).json({ success: false, statusCode: 502, error: message });
+    databaseError = error;
+    logger.error(
+      { service: 'BlogPostController', function: 'getAllBlogPosts' },
+      'Could not load RoomReview blog posts',
+      { error },
+    );
   }
+  let wordPressPosts: CachedBlogPosts | null = null;
+  let wordPressError: unknown;
+  try {
+    wordPressPosts = await getCachedWordPressPosts(page, perPage);
+  } catch (error) {
+    wordPressError = error;
+  }
+
+  if (!wordPressPosts && databasePosts.length === 0) {
+    const error = wordPressError ?? databaseError;
+    const message =
+      error instanceof Error ? error.message : 'Unable to load blog posts';
+    res.status(502).json({ success: false, statusCode: 502, error: message });
+    return;
+  }
+
+  const localPosts = databasePosts.map((post) => mapDatabasePost(post));
+  const postsBySlug = new Map(
+    (wordPressPosts?.data ?? []).map((post) => [post.slug, post]),
+  );
+  if (page === 1) {
+    localPosts.forEach((post) => postsBySlug.set(post.slug, post));
+  }
+  const mergedPosts = [...postsBySlug.values()].sort(
+    (first, second) => Date.parse(second.date) - Date.parse(first.date),
+  );
+  const total = (wordPressPosts?.pagination.total ?? 0) + databasePosts.length;
+  const totalPages = Math.ceil(total / perPage);
+  res.status(200).json({
+    success: true,
+    statusCode: 200,
+    data: page === 1 ? mergedPosts.slice(0, perPage) : mergedPosts,
+    pagination: {
+      page,
+      limit: perPage,
+      total,
+      totalPages,
+    },
+    message: 'Blog posts fetched successfully',
+  });
 };
 
 export const getBlogPostById = async (
@@ -259,7 +323,25 @@ export const getBlogPostById = async (
   res: Response,
 ): Promise<void> => {
   const routeId = req.params.id;
-  const id = Array.isArray(routeId) ? routeId[0] ?? '' : routeId;
+  const id = Array.isArray(routeId) ? (routeId[0] ?? '') : routeId;
+  if (/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)) {
+    const databasePost = await blogPostRepository.findPublishedById(id);
+    if (!databasePost) {
+      res.status(404).json({
+        success: false,
+        statusCode: 404,
+        error: 'Blog post not found',
+      });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      data: mapDatabasePost(databasePost, true),
+      message: 'Blog post fetched successfully',
+    });
+    return;
+  }
   if (!/^\d+$/.test(id)) {
     res
       .status(400)
@@ -283,7 +365,8 @@ export const getBlogPostById = async (
       error instanceof Error
         ? error.message
         : 'Unable to load blog post from WordPress';
-    const statusCode = error instanceof WordPressApiError ? error.statusCode : 502;
+    const statusCode =
+      error instanceof WordPressApiError ? error.statusCode : 502;
     res.status(statusCode).json({ success: false, statusCode, error: message });
   }
 };
@@ -293,9 +376,35 @@ export const getBlogPostBySlug = async (
   res: Response,
 ): Promise<void> => {
   const routeSlug = req.params.slug;
-  const slug = Array.isArray(routeSlug) ? routeSlug[0] ?? '' : routeSlug;
+  const slug = Array.isArray(routeSlug) ? (routeSlug[0] ?? '') : routeSlug;
   if (!/^[a-z0-9-]+$/i.test(slug)) {
-    res.status(400).json({ success: false, statusCode: 400, error: 'Invalid blog post slug' });
+    res.status(400).json({
+      success: false,
+      statusCode: 400,
+      error: 'Invalid blog post slug',
+    });
+    return;
+  }
+
+  let databasePost: Awaited<
+    ReturnType<typeof blogPostRepository.findPublishedBySlug>
+  > = null;
+  try {
+    databasePost = await blogPostRepository.findPublishedBySlug(slug);
+  } catch (error) {
+    logger.error(
+      { service: 'BlogPostController', function: 'getBlogPostBySlug' },
+      'Could not load RoomReview blog post',
+      { error },
+    );
+  }
+  if (databasePost) {
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      data: mapDatabasePost(databasePost, true),
+      message: 'Blog post fetched successfully',
+    });
     return;
   }
 
@@ -307,7 +416,11 @@ export const getBlogPostBySlug = async (
     const { data } = await fetchWordPressJson<WordPressEmbeddedPost[]>(url);
     const post = data[0];
     if (!post) {
-      res.status(404).json({ success: false, statusCode: 404, error: 'Blog post not found' });
+      res.status(404).json({
+        success: false,
+        statusCode: 404,
+        error: 'Blog post not found',
+      });
       return;
     }
     res.status(200).json({
@@ -321,41 +434,105 @@ export const getBlogPostBySlug = async (
       error instanceof Error
         ? error.message
         : 'Unable to load blog post from WordPress';
-    const statusCode = error instanceof WordPressApiError ? error.statusCode : 502;
+    const statusCode =
+      error instanceof WordPressApiError ? error.statusCode : 502;
     res.status(statusCode).json({ success: false, statusCode, error: message });
   }
 };
 
-export const createBlogPost = (
-  _req: Request,
+export const createBlogPost = async (
+  req: Request,
   res: Response,
-): void => {
-  const response: ApiResponse<null> = {
+): Promise<void> => {
+  const title = req.body.title as string;
+  const content = req.body.content as string;
+  const post = await blogPostRepository.createDraft({
+    title,
+    excerpt: (req.body.excerpt as string | undefined) ?? content.slice(0, 300),
+    content,
+  });
+
+  blogPostsCache.clear();
+  const response: ApiResponse<BlogPost> = {
     success: true,
     statusCode: 201,
-    data: null,
-    message: 'Blog post created successfully',
+    data: mapDatabasePost(post, true),
+    message: 'Blog post saved as a draft in RoomReview',
   };
   res.status(201).json(response);
 };
 
-export const updateBlogPost = (
-  _req: Request,
+export const publishBlogPost = async (
+  req: Request,
   res: Response,
-): void => {
-  const response: ApiResponse<null> = {
+): Promise<void> => {
+  const routeId = req.params.id;
+  const id = Array.isArray(routeId) ? (routeId[0] ?? '') : routeId;
+  const existingPost = await blogPostRepository.findById(id);
+  if (!existingPost) {
+    throw new EntityNotFoundError({
+      message: 'Blog post not found',
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  const post = await blogPostRepository.publish(id, existingPost.published_at);
+  blogPostsCache.clear();
+  const response: ApiResponse<BlogPost> = {
     success: true,
     statusCode: 200,
-    data: null,
+    data: mapDatabasePost(post, true),
+    message: 'Blog post published successfully',
+  };
+  res.status(200).json(response);
+};
+
+export const updateBlogPost = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const routeId = req.params.id;
+  const id = Array.isArray(routeId) ? (routeId[0] ?? '') : routeId;
+  const existingPost = await blogPostRepository.findById(id);
+  if (!existingPost) {
+    throw new EntityNotFoundError({
+      message: 'Blog post not found',
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  const post = await blogPostRepository.update(id, {
+    title: req.body.title as string,
+    excerpt:
+      (req.body.excerpt as string | undefined) ??
+      (req.body.content as string).slice(0, 300),
+    content: req.body.content as string,
+  });
+  blogPostsCache.clear();
+  const response: ApiResponse<BlogPost> = {
+    success: true,
+    statusCode: 200,
+    data: mapDatabasePost(post, true),
     message: 'Blog post updated successfully',
   };
   res.status(200).json(response);
 };
 
-export const deleteBlogPost = (
-  _req: Request,
+export const deleteBlogPost = async (
+  req: Request,
   res: Response,
-): void => {
+): Promise<void> => {
+  const routeId = req.params.id;
+  const id = Array.isArray(routeId) ? (routeId[0] ?? '') : routeId;
+  const existingPost = await blogPostRepository.findById(id);
+  if (!existingPost) {
+    throw new EntityNotFoundError({
+      message: 'Blog post not found',
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+  await blogPostRepository.delete(id);
+  blogPostsCache.clear();
   const response: ApiResponse<null> = {
     success: true,
     statusCode: 200,
