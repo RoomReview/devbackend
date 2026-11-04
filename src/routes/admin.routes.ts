@@ -3,13 +3,22 @@ import * as adminController from '@/controllers/admin.controller';
 import { authenticate, authorize } from '@/middleware/auth.middleware';
 import { validateRequest } from '@/middleware/validation.middleware';
 import { ModerateReviewDto } from '@/dto/review.dto';
+import { GrantReportCreditsDto } from '@/dto/admin.dto';
 import { auditAdminAction } from '@/middleware/admin-audit.middleware';
 
 const router = Router();
 
 router.get('/overview', authenticate, authorize('view:users:all'), auditAdminAction, adminController.getOverview);
 router.get('/users', authenticate, authorize('view:users:all'), auditAdminAction, adminController.getUsers);
-router.get('/audit-logs', authenticate, authorize('view:users:all'), auditAdminAction, adminController.getAuditLogs);
+router.post(
+  '/report-credits',
+  authenticate,
+  authorize('manage:users'),
+  auditAdminAction,
+  validateRequest({ body: GrantReportCreditsDto }),
+  adminController.grantReportCredits,
+);
+router.get('/audit-logs', authenticate, authorize('view:admin:audit-logs'), auditAdminAction, adminController.getAuditLogs);
 router.get('/reviews', authenticate, authorize('manage:reviews'), auditAdminAction, adminController.getReviews);
 router.delete('/reviews/:reviewId', authenticate, authorize('manage:reviews'), auditAdminAction, adminController.deleteReview);
 router.patch(
