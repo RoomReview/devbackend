@@ -1,4 +1,4 @@
-import { describe, it, mock } from 'node:test';
+import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert';
 import config from '../config';
 import {
@@ -10,10 +10,44 @@ import {
   sendNewsletterArticleEmail,
   sendAgencyInvitationEmail,
 } from './email';
-import sgMail from '@sendgrid/mail';
 
-mock.method(sgMail, 'send', async () => {});
-mock.method(sgMail, 'setApiKey', () => {});
+interface CapturedEmail {
+  to?: string;
+  from?: { email: string; name?: string };
+  subject?: string;
+  text?: string;
+  html?: string;
+  template_id?: string;
+  categories?: string[];
+  personalizations?: Array<{
+    to: { email: string; name?: string };
+    dynamic_template_data?: Record<string, string>;
+  }>;
+  tracking_settings?: {
+    click_tracking: { enable: boolean; enable_text: boolean };
+  };
+  mail_settings?: { sandbox_mode: { enable: boolean } };
+  asm?: { group_id: number };
+}
+
+const emailRequests: Array<{ url: string; init?: RequestInit }> = [];
+let responseStatus = 202;
+
+mock.method(globalThis, 'fetch', async (input, init) => {
+  emailRequests.push({ url: String(input), init });
+  return new Response(null, { status: responseStatus });
+});
+
+beforeEach(() => {
+  emailRequests.length = 0;
+  responseStatus = 202;
+});
+
+const getLastEmail = (): CapturedEmail => {
+  const body = emailRequests.at(-1)?.init?.body;
+  assert.equal(typeof body, 'string');
+  return JSON.parse(body) as CapturedEmail;
+};
 
 describe('sendVerificationEmail', () => {
   it('should send verification email', async () => {
@@ -25,8 +59,7 @@ describe('sendVerificationEmail', () => {
     }
     await sendVerificationEmail(toEmail, code, name);
 
-    const mockCalls = (sgMail.send as any).mock.calls;
-    const lastCallArgs = mockCalls[mockCalls.length - 1].arguments[0];
+    const lastCallArgs = getLastEmail();
 
     assert.deepStrictEqual(lastCallArgs, {
       from: {
@@ -45,8 +78,8 @@ describe('sendVerificationEmail', () => {
           },
         },
       ],
-      mailSettings: {
-        sandboxMode: {
+      mail_settings: {
+        sandbox_mode: {
           enable: config.sendGridSandboxMode,
         },
       },
@@ -59,8 +92,7 @@ describe('sendVerificationEmail', () => {
       (config as any).sendGridApiKey = 'test';
     }
     await sendVerificationEmail('agent@example.com', '123456', 'Agent', 'invitation-token');
-    const mockCalls = (sgMail.send as any).mock.calls;
-    const data = mockCalls[mockCalls.length - 1].arguments[0];
+    const data = getLastEmail();
     assert.match(data.text, /teamInviteToken=invitation-token/);
   });
 
@@ -103,15 +135,14 @@ describe('sendResetPasswordEmail', () => {
 
     await sendResetPasswordEmail(toEmail, name, resetPasswordLink);
 
-    const mockCalls = (sgMail.send as any).mock.calls;
-    const lastCallArgs = mockCalls[mockCalls.length - 1].arguments[0];
+    const lastCallArgs = getLastEmail();
 
     assert.deepStrictEqual(lastCallArgs, {
       from: {
         email: config.emailFrom,
         name: 'RoomReview',
       },
-      templateId: config.sendResetPasswordCodeV1TemplateId,
+      template_id: config.sendResetPasswordCodeV1TemplateId,
       categories: ['reset-password'],
       personalizations: [
         {
@@ -119,7 +150,7 @@ describe('sendResetPasswordEmail', () => {
             email: toEmail,
             name: name,
           },
-          dynamicTemplateData: {
+          dynamic_template_data: {
             ...config.sendGridTemplateParameters[
               config.sendResetPasswordCodeV1TemplateId
             ],
@@ -128,14 +159,14 @@ describe('sendResetPasswordEmail', () => {
           },
         },
       ],
-      trackingSettings: {
-        clickTracking: {
+      tracking_settings: {
+        click_tracking: {
           enable: false,
-          enableText: false,
+          enable_text: false,
         },
       },
-      mailSettings: {
-        sandboxMode: {
+      mail_settings: {
+        sandbox_mode: {
           enable: config.sendGridSandboxMode,
         },
       },
@@ -173,8 +204,7 @@ describe('sendReviewModerationEmail', () => {
       '<Please remove private details>',
     );
 
-    const mockCalls = (sgMail.send as any).mock.calls;
-    const data = mockCalls[mockCalls.length - 1].arguments[0];
+    const data = getLastEmail();
     assert.equal(data.to, 'test@example.com');
     assert.equal(data.categories[0], 'review-moderation');
     assert.match(data.text, /not approved/i);
@@ -208,8 +238,7 @@ describe('sendSubscriptionInvoiceEmail', () => {
         },
       );
 
-      const mockCalls = (sgMail.send as any).mock.calls;
-      const data = mockCalls[mockCalls.length - 1].arguments[0];
+      const data = getLastEmail();
       assert.equal(data.to, 'customer@example.com');
       assert.equal(data.from.email, config.emailFrom);
       assert.equal(data.subject, 'Your RoomReview subscription invoice <INV-123>');
@@ -249,8 +278,7 @@ describe('sendAgencyInvitationEmail', () => {
       'invitation-token',
     );
 
-    const mockCalls = (sgMail.send as any).mock.calls;
-    const data = mockCalls[mockCalls.length - 1].arguments[0];
+    const data = getLastEmail();
     assert.equal(data.personalizations[0].to.email, 'agent@example.com');
     assert.match(data.text, /invited you to join A&B Agency on RoomReview/);
     assert.match(data.html, /&lt;Founder&gt;/);
@@ -270,8 +298,7 @@ describe('newsletter email helpers', () => {
       'confirmation-token',
     );
 
-    const mockCalls = (sgMail.send as any).mock.calls;
-    const data = mockCalls[mockCalls.length - 1].arguments[0];
+    const data = getLastEmail();
     assert.equal(data.from.email, 'info@roomreview.co.uk');
     assert.match(
       data.text,
@@ -294,9 +321,8 @@ describe('newsletter email helpers', () => {
       123,
     );
 
-    const mockCalls = (sgMail.send as any).mock.calls;
-    const data = mockCalls[mockCalls.length - 1].arguments[0];
-    assert.equal(data.asm.groupId, 123);
+    const data = getLastEmail();
+    assert.equal(data.asm?.group_id, 123);
     assert.match(data.html, /&lt;New article&gt;/);
     assert.match(data.html, /&lt;Summary &amp; details&gt;/);
     assert.match(data.html, /newsletter\/unsubscribe\/token/);
@@ -305,6 +331,34 @@ describe('newsletter email helpers', () => {
 
 // test if sendGridApiKey is not defined
 describe('sendEmail', () => {
+  it('posts the email payload to SendGrid with bearer authorization', async () => {
+    if (!config.sendGridApiKey) {
+      (config as any).sendGridApiKey = 'test';
+    }
+
+    await sendVerificationEmail('test@example.com', '123456', 'Test');
+
+    const request = emailRequests.at(-1);
+    assert.ok(request);
+    assert.equal(request.url, 'https://api.sendgrid.com/v3/mail/send');
+    assert.equal(request.init?.method, 'POST');
+    const headers = new Headers(request.init?.headers);
+    assert.equal(headers.get('authorization')?.startsWith('Bearer '), true);
+    assert.equal(headers.get('content-type'), 'application/json');
+  });
+
+  it('surfaces SendGrid HTTP failures', async () => {
+    if (!config.sendGridApiKey) {
+      (config as any).sendGridApiKey = 'test';
+    }
+    responseStatus = 401;
+
+    await assert.rejects(
+      sendVerificationEmail('test@example.com', '123456', 'Test'),
+      { message: 'Failed to send email' },
+    );
+  });
+
   it('should throw error if sendGridApiKey is not defined', async () => {
     const toEmail = 'test@example.com';
     const code = '123456';
