@@ -42,11 +42,11 @@ import { authenticate } from '@/middleware/auth.middleware';
  *           minLength: 8
  *         role:
  *           type: string
- *           enum: [AGENCY, AGENT]
+ *           enum: [AGENCY]
  *         agencyName:
  *           type: string
  *           maxLength: 150
- *           description: Required for AGENCY and AGENT roles.
+ *           description: Required for AGENCY registrations.
  *         agencyPhone:
  *           type: string
  *           maxLength: 50
@@ -72,6 +72,7 @@ import { authenticate } from '@/middleware/auth.middleware';
  *         role:
  *           type: string
  *           enum: [LANDLORD, TENANT, AGENCY, AGENT]
+ *           description: AGENT is only accepted when a valid agency inviteToken is provided.
  *         agencyName:
  *           type: string
  *           maxLength: 150
@@ -149,7 +150,7 @@ router.post(
  * @swagger
  * /auth/early-access:
  *   post:
- *     summary: Register for early access with three reports and 50% off the first paid month
+ *     summary: Register for early access and receive 50% off the first paid subscription month
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -159,7 +160,7 @@ router.post(
  *             $ref: '#/components/schemas/EarlyAccessRegisterDto'
  *     responses:
  *       201:
- *         description: Account created with three report credits and eligibility for 50% off its first paid subscription month
+ *         description: Account created with eligibility for 50% off its first paid subscription month
  *       400:
  *         description: Invalid input or disposable email domain
  */
