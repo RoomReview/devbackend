@@ -17,6 +17,12 @@ import { EntityNotFoundError, InternalServerError, UnauthorizedError, Validation
 import logger, { LogContext } from '@/utils/logger';
 import { findUserById } from '@/repositories/users.repository';
 import { sendSubscriptionInvoiceEmail } from '@/utils/email';
+import {
+  isSubscriptionPlanId,
+  subscriptionPlans,
+  type SubscriptionPlanId,
+  getSubscriptionMonthlyReportAllowance,
+} from '@/config/subscription-plans';
 
 const logContext: LogContext = { service: 'payment.service', function: 'handleWebhook' };
 
@@ -171,15 +177,15 @@ export const createCheckout = async (scoreReportId: string, userId: string) => {
 };
 
 const pricingPlans = {
-  individual: { name: 'Individual Agent', seats: 1, amount: 3500, monthlyReports: 20 },
-  'small-team': { name: 'Small Team', seats: 5, amount: 14900, monthlyReports: 60 },
-  branch: { name: 'Branch', seats: 10, amount: 24900, monthlyReports: 110 },
+  individual: { name: 'Individual Agent', ...subscriptionPlans.individual, amount: 3500 },
+  'small-team': { name: 'Small Team', ...subscriptionPlans['small-team'], amount: 14900 },
+  branch: { name: 'Branch', ...subscriptionPlans.branch, amount: 24900 },
 } as const;
 
-export type PricingPlanId = keyof typeof pricingPlans;
+export type PricingPlanId = SubscriptionPlanId;
 
 const isPricingPlanId = (value: string): value is PricingPlanId =>
-  Object.prototype.hasOwnProperty.call(pricingPlans, value);
+  isSubscriptionPlanId(value);
 
 const subscriptionPlanMetadata = (metadata?: Record<string, string>) => {
   const planId = metadata?.planId;
@@ -233,9 +239,6 @@ export const createSubscriptionCheckout = async (userId: string, planId?: string
   }
 
   const billing = await getBillingStatus(userId);
-  if (billing.trialActive) {
-    throw new ValidationError({ message: 'Your free trial is still active', code: 'VALIDATION_ERROR' });
-  }
   if (billing.subscription?.status === 'ACTIVE') {
     return { checkoutUrl: null, subscription: billing.subscription };
   }
@@ -255,6 +258,7 @@ export const createSubscriptionCheckout = async (userId: string, planId?: string
     'metadata[userId]': userId,
   });
   if (earlyAccessCoupon) {
+    form.set('payment_method_collection', 'always');
     form.set('subscription_data[metadata][earlyAccessDiscount]', 'true');
     form.set('metadata[earlyAccessDiscount]', 'true');
     form.set('discounts[0][coupon]', earlyAccessCoupon.id);
@@ -276,7 +280,10 @@ export const createSubscriptionCheckout = async (userId: string, planId?: string
     form.set('line_items[0][price_data][currency]', config.stripeCurrency);
     form.set('line_items[0][price_data][unit_amount]', String(config.stripeSubscriptionAmount));
     form.set('line_items[0][price_data][recurring][interval]', 'month');
-    form.set('line_items[0][price_data][product_data][name]', 'RoomReview - 10 reports per month');
+    form.set(
+      'line_items[0][price_data][product_data][name]',
+      `RoomReview - ${config.stripeSubscriptionCredits} reports per month`,
+    );
   }
   const session = await stripeRequest('checkout/sessions', form);
   return { checkoutUrl: session.url, subscription: null };
@@ -395,9 +402,11 @@ const processWebhookEvent = async (event: { id: string; type: string; data: { ob
       invoiceId: invoice.id,
       credits: stripeSubscription
         ? subscriptionMonthlyReports(stripeSubscription.metadata)
-        : subscription.seatLimit > 0
-          ? (subscription.seatLimit + 1) * 10
-          : config.stripeSubscriptionCredits,
+        : getSubscriptionMonthlyReportAllowance(
+          subscription.planId,
+          subscription.seatLimit,
+          config.stripeSubscriptionCredits,
+        ),
     });
     const user = await findUserById(subscription.userId, {
       email: true,
