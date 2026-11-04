@@ -55,6 +55,7 @@ import { sendResetPasswordEmail, sendVerificationEmail } from '@/utils/email';
 import config from '@/config';
 import { createHash, randomBytes } from 'node:crypto';
 import { isDisposableEmail } from '@/utils/disposable-email';
+import { normalizeEmailAddress } from '@/utils/email-address';
 
 const logContext: LogContext = {
   service: 'auth.service',
@@ -66,7 +67,11 @@ export const registerUser = async (
   options: { earlyAccessRegistration?: boolean } = {},
 ) => {
   logContext.function = 'registerUser';
-  const existingUser = await findUserByEmail(data.email);
+  const normalizedData = {
+    ...data,
+    email: normalizeEmailAddress(data.email),
+  };
+  const existingUser = await findUserByEmail(normalizedData.email);
   if (existingUser) {
     throw new ValidationError({
       message: 'This email address is already taken',
@@ -78,7 +83,7 @@ export const registerUser = async (
 
   const token = generateVerificationCode();
 
-  const user = await createUserAccount(data, hashedPassword, {
+  const user = await createUserAccount(normalizedData, hashedPassword, {
     expiresAt: token.expiresAt,
     hashedCode: token.hashedCode,
   }, options);
@@ -86,7 +91,7 @@ export const registerUser = async (
   let emailSent = false;
   try {
     await sendVerificationEmail(
-      data.email,
+      normalizedData.email,
       token.code,
       `${data.firstName} ${data.lastName}`,
       data.inviteToken,
@@ -94,7 +99,7 @@ export const registerUser = async (
     emailSent = true;
   } catch (error) {
     logger.warn(logContext, 'Verification email could not be sent; continuing registration', {
-      email: data.email,
+      email: normalizedData.email,
       error,
     });
   }
@@ -116,7 +121,7 @@ export const registerEarlyAccessUser = async (data: EarlyAccessRegisterDto) => {
     ...data,
     firstName: data.firstName.trim(),
     lastName: data.lastName.trim(),
-    email: data.email.trim().toLowerCase(),
+    email: normalizeEmailAddress(data.email),
   };
   if (isDisposableEmail(normalizedData.email)) {
     throw new ValidationError({
@@ -213,7 +218,7 @@ export const resetEmailVerification = async (email: string) => {
 
   const token = generateVerificationCode();
 
-  await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
+  await updateUserVerifyCode(user.email, token.hashedCode, token.expiresAt);
 
   return { isNewCodeGenerated: true };
 };
@@ -236,10 +241,10 @@ export const forgotPassword = async (email: string) => {
 
   const token = generatePasswordResetToken();
   const resetPasswordLink = config.sendGridTemplateParameters[config.sendResetPasswordCodeV1TemplateId].reset_pswd_button_link;
-  const resetPasswordUrl = `${resetPasswordLink}?token=${token.code}&email=${encodeURIComponent(email)}`;
+  const resetPasswordUrl = `${resetPasswordLink}?token=${token.code}&email=${encodeURIComponent(user.email)}`;
 
-  await updateUserVerifyCode(email, token.hashedCode, token.expiresAt);
-  await sendResetPasswordEmail(email, `${user.firstName} ${user.lastName}`, resetPasswordUrl);
+  await updateUserVerifyCode(user.email, token.hashedCode, token.expiresAt);
+  await sendResetPasswordEmail(user.email, `${user.firstName} ${user.lastName}`, resetPasswordUrl);
 
   return { isEmailSent: true };
 };
