@@ -42,11 +42,66 @@ describe('mvp core data layer', () => {
       },
       '33333333-3333-4333-8333-333333333333',
       async (record) => record,
+      async () => ({ firstName: 'Test', lastName: 'Reviewer' }),
     );
 
     assert.ok(review.review_id);
+    assert.equal(review.author_first_name, 'Test');
+    assert.equal(review.author_last_name, 'Reviewer');
     assert.equal(review.title, 'Good transport links');
     assert.equal(review.overall_rating, 4.5);
     assert.equal(review.status, 'PENDING');
+  });
+
+  it('automatically approves a clean review with more than 50 comment characters', async () => {
+    const review = await createReview(
+      {
+        title: 'Good transport links',
+        content:
+          'The station is nearby and the neighbourhood is pleasant for families.',
+        safety_rating: 5,
+        transport_rating: 4,
+        amenities_rating: 5,
+        value_rating: 4,
+        pros: [],
+        cons: [],
+        years_lived: null,
+        anonymous: false,
+        postcode_id: '22222222-2222-4222-8222-222222222222',
+        borough_id: null,
+      },
+      '33333333-3333-4333-8333-333333333333',
+      async (record) => record,
+      async () => ({ firstName: 'Test', lastName: 'Reviewer' }),
+    );
+
+    assert.equal(review.status, 'APPROVED');
+    assert.ok(review.published_at);
+  });
+
+  it('keeps a longer review pending when any review text contains profanity', async () => {
+    const review = await createReview(
+      {
+        title: 'Good transport links',
+        content:
+          'The station is nearby and the neighbourhood is pleasant for families.',
+        safety_rating: 5,
+        transport_rating: 4,
+        amenities_rating: 5,
+        value_rating: 4,
+        pros: ['Convenient shops'],
+        cons: ['The service was shit'],
+        years_lived: null,
+        anonymous: false,
+        postcode_id: '22222222-2222-4222-8222-222222222222',
+        borough_id: null,
+      },
+      '33333333-3333-4333-8333-333333333333',
+      async (record) => record,
+      async () => ({ firstName: 'Test', lastName: 'Reviewer' }),
+    );
+
+    assert.equal(review.status, 'PENDING');
+    assert.equal(review.published_at, null);
   });
 });
