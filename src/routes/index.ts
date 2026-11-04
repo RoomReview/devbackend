@@ -33,6 +33,7 @@ import seoRoutes from './seo.routes';
 import paymentRoutes from './payment.routes';
 import adminRoutes from './admin.routes';
 import teamRoutes from './team.routes';
+import affiliateRewardRoutes from './affiliate-reward.routes';
 import { errorHandler, notFoundHandler } from '@middleware/error.middleware';
 
 const router = Router();
@@ -68,6 +69,7 @@ router.use('/data/postcode', postcodeDataRoutes);
 router.use('/score-reports', scoreReportRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/team', teamRoutes);
+router.use('/rewards', affiliateRewardRoutes);
 router.use('/admin', adminRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/seo', seoRoutes);
