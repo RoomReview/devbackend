@@ -1,13 +1,79 @@
-import sgMail, { MailDataRequired } from '@sendgrid/mail';
 import config from '../config';
 import logger, { LogContext } from './logger';
+
+type EmailAddress = string | { email: string; name?: string };
+
+interface SendGridMailData {
+  from: EmailAddress;
+  to?: EmailAddress | EmailAddress[];
+  subject?: string;
+  text?: string;
+  html?: string;
+  templateId?: string;
+  categories?: string[];
+  personalizations?: Array<{
+    to: EmailAddress | EmailAddress[];
+    dynamicTemplateData?: Record<string, string>;
+  }>;
+  mailSettings?: { sandboxMode: { enable: boolean } };
+  trackingSettings?: {
+    clickTracking: { enable: boolean; enableText: boolean };
+  };
+  asm?: { groupId: number };
+}
+
+const toSendGridPayload = (data: SendGridMailData) => {
+  const {
+    templateId,
+    personalizations,
+    mailSettings,
+    trackingSettings,
+    asm,
+    ...message
+  } = data;
+
+  return {
+    ...message,
+    ...(templateId !== undefined ? { template_id: templateId } : {}),
+    ...(personalizations
+      ? {
+          personalizations: personalizations.map(
+            ({ dynamicTemplateData, ...personalization }) => ({
+              ...personalization,
+              ...(dynamicTemplateData
+                ? { dynamic_template_data: dynamicTemplateData }
+                : {}),
+            }),
+          ),
+        }
+      : {}),
+    ...(mailSettings
+      ? {
+          mail_settings: {
+            sandbox_mode: { enable: mailSettings.sandboxMode.enable },
+          },
+        }
+      : {}),
+    ...(trackingSettings
+      ? {
+          tracking_settings: {
+            click_tracking: {
+              enable: trackingSettings.clickTracking.enable,
+              enable_text: trackingSettings.clickTracking.enableText,
+            },
+          },
+        }
+      : {}),
+    ...(asm ? { asm: { group_id: asm.groupId } } : {}),
+  };
+};
 
 const logContext: LogContext = {
   service: 'email.service',
   function: '',
 };
 
-const sendEmail = async (data: MailDataRequired) => {
+const sendEmail = async (data: SendGridMailData) => {
   logContext.function = 'sendEmail';
   if (!config.sendGridApiKey) {
     const message = 'SendGrid API key is not defined';
@@ -23,14 +89,23 @@ const sendEmail = async (data: MailDataRequired) => {
     throw new Error(message);
   }
 
-  sgMail.setApiKey(config.sendGridApiKey);
   logger.info(logContext, 'Sending email', {
     to: data.personalizations?.[0]?.to,
     templateId: data.templateId,
   });
 
   try {
-    await sgMail.send(data);
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.sendGridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(toSendGridPayload(data)),
+    });
+    if (!response.ok) {
+      throw new Error(`SendGrid returned HTTP ${response.status}`);
+    }
     logger.info(logContext, 'Email sent successfully', {
       to: data.personalizations?.[0]?.to,
       templateId: data.templateId,
@@ -83,7 +158,7 @@ export const sendVerificationEmail = async (
   const greetingName = escapeHtml(name);
   const linkHref = escapeHtml(verificationUrl.toString());
 
-  const data: MailDataRequired = {
+  const data: SendGridMailData = {
     from: {
       email: config.verificationEmailFrom,
       name: 'RoomReview',
@@ -165,7 +240,7 @@ export const sendResetPasswordEmail = async (
   }
   templateData.name = name;
 
-  const data: MailDataRequired = {
+  const data: SendGridMailData = {
     from: {
       email: config.emailFrom,
       name: 'RoomReview',
