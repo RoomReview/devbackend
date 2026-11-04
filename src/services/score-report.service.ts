@@ -665,4 +665,3 @@ export const generateScoreReportPdf = async (id: string, preparedForName = '') =
 };
 
 export const _getScoreReportWorkerRetryDelayMsForTest = getScoreReportWorkerRetryDelayMs;
-
