@@ -1,6 +1,13 @@
 import type { Response } from 'express';
 import type { ApiResponse, AuthenticatedRequest } from '@/types';
-import { getAdminAuditLogs, getAdminOverview, getAdminUsers, setUserActive } from '@/repositories/admin.repository';
+import {
+  findAdminCreditRecipient,
+  findAdminCreditRecipientById,
+  getAdminAuditLogs,
+  getAdminOverview,
+  getAdminUsers,
+  setUserActive,
+} from '@/repositories/admin.repository';
 import { ModerateReviewDto } from '@/dto/review.dto';
 import {
   deleteReview as deleteReviewService,
@@ -11,6 +18,12 @@ import { getReviewNotificationRecipient } from '@/repositories/users.repository'
 import { sendReviewModerationEmail } from '@/utils/email';
 import logger from '@/utils/logger';
 import { cancelSubscriptionAtPeriodEnd } from '@/services/payment.service';
+import { GrantReportCreditsDto } from '@/dto/admin.dto';
+import {
+  getReportCreditAccountUserId,
+  grantAdminReportCredits,
+} from '@/repositories/billing.repository';
+import { EntityNotFoundError, UnauthorizedError } from '@/utils/custom-error';
 
 export const getOverview = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
   const data = await getAdminOverview();
@@ -30,6 +43,50 @@ export const getUsers = async (_req: AuthenticatedRequest, res: Response): Promi
     statusCode: 200,
     data,
     message: 'Administrative users fetched successfully',
+  };
+  res.status(200).json(response);
+};
+
+export const grantReportCredits = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  const input = GrantReportCreditsDto.parse(req.body);
+  const adminEmail = req.user?.email;
+  if (!adminEmail) {
+    throw new UnauthorizedError({
+      message: 'Administrator authentication is required',
+    });
+  }
+
+  const recipient = await findAdminCreditRecipient(input.email);
+  if (!recipient) {
+    throw new EntityNotFoundError({
+      message: 'No user account was found for that email address.',
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  const creditAccountUserId = await getReportCreditAccountUserId(recipient.userId);
+  const credited = await grantAdminReportCredits({
+    userId: creditAccountUserId,
+    credits: input.credits,
+    adminEmail,
+  });
+  const creditAccount = creditAccountUserId === recipient.userId
+    ? recipient
+    : await findAdminCreditRecipientById(creditAccountUserId);
+  const data = {
+    email: recipient.email,
+    creditAccountEmail: creditAccount?.email ?? recipient.email,
+    creditsAdded: input.credits,
+    balance: credited.balance,
+  };
+  const response: ApiResponse<typeof data> = {
+    success: true,
+    statusCode: 200,
+    data,
+    message: 'Report credits added successfully',
   };
   res.status(200).json(response);
 };
