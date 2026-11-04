@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { UserCreateInput, UserSelect } from '@/generated/prisma/models';
 import * as userDal from '@/repositories/users.repository';
 import { PaginateArgs } from '@/types';
@@ -165,14 +165,6 @@ export const registerUser = async (
         code: 'VALIDATION_ERROR',
       });
     }
-    const trialStartedAt = new Date();
-    const hasTrial = data.role === UserRole.AGENCY
-      || data.role === UserRole.AGENT
-      || data.role === UserRole.TENANT
-      || data.role === UserRole.LANDLORD;
-    const trialEndsAt = hasTrial && !earlyAccessRegistration
-      ? new Date(trialStartedAt.getTime() + 30 * 24 * 60 * 60 * 1000)
-      : null;
     const newUser = await userDal.createUser(
       {
         email: data.email,
@@ -184,57 +176,10 @@ export const registerUser = async (
         isEmailVerified: false,
         isActive: true,
         role: data.role,
-        trialStartedAt: hasTrial && !earlyAccessRegistration ? trialStartedAt : null,
-        trialEndsAt,
         earlyAccessDiscountEligible: earlyAccessRegistration,
       },
       tx,
     );
-
-    const registrationCredits = earlyAccessRegistration
-      ? 3
-      : data.role === UserRole.TENANT || data.role === UserRole.LANDLORD
-        ? 1
-        : 0;
-    if (registrationCredits > 0) {
-      const userCreditsId = randomUUID();
-      const eventId = earlyAccessRegistration
-        ? `early-access-registration:${newUser.userId}`
-        : `registration-trial:${newUser.userId}`;
-      const description = earlyAccessRegistration
-        ? 'Early access registration: three free reports'
-        : 'Registration bonus: one free report';
-      await tx.$executeRaw`
-        INSERT INTO billing_credit_grants
-          (billing_credit_grant_id, user_id, stripe_event_id, stripe_invoice_id, credits)
-        VALUES (
-          ${randomUUID()}::uuid,
-          ${newUser.userId}::uuid,
-          ${eventId},
-          NULL,
-          ${registrationCredits}
-        )
-      `;
-      await tx.$executeRaw`
-        INSERT INTO user_credits
-          (user_credits_id, user_id, credits_balance, subscription_plan, created_at, updated_at)
-        VALUES (${userCreditsId}::uuid, ${newUser.userId}::uuid, ${registrationCredits}, 'FREE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `;
-      await tx.$executeRaw`
-        INSERT INTO credit_transactions
-          (credit_transaction_id, user_credits_id, amount, type, description, balance_after, created_at, updated_at)
-        VALUES (
-          ${randomUUID()}::uuid,
-          ${userCreditsId}::uuid,
-          ${registrationCredits},
-          'BONUS',
-          ${description},
-          ${registrationCredits},
-          CURRENT_TIMESTAMP,
-          CURRENT_TIMESTAMP
-        )
-      `;
-    }
 
     if (!invitation && (data.role === UserRole.AGENCY || data.role === UserRole.AGENT)) {
       const agencyName = data.agencyName?.trim();
