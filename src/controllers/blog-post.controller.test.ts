@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import type { Request, Response } from 'express';
-import { getAllBlogPosts, getBlogPostById, getBlogPostBySlug } from './blog-post.controller';
+import { blogPostRepository } from '@/repositories/blog-post.repository';
+import {
+  createBlogPost,
+  getAllBlogPosts,
+  getBlogPostById,
+  getBlogPostBySlug,
+} from './blog-post.controller';
 
 const createRequest = (
   query: Record<string, string> = {},
   id = '',
   slug = '',
-) => ({ query, params: { id, slug } }) as unknown as Request;
+  body: Record<string, unknown> = {},
+) => ({ query, params: { id, slug }, body }) as unknown as Request;
 
 const createResponse = () => {
   const response = {
@@ -30,6 +37,7 @@ const jsonResponse = (body: unknown, headers?: Record<string, string>) =>
 
 describe('blog post controller', () => {
   it('loads lightweight summaries and batches article metadata for the listing', async (context) => {
+    context.mock.method(blogPostRepository, 'findPublished', async () => []);
     const requestedUrls: URL[] = [];
     context.mock.method(
       globalThis,
@@ -157,6 +165,11 @@ describe('blog post controller', () => {
   });
 
   it('fetches a published article by its slug', async (context) => {
+    context.mock.method(
+      blogPostRepository,
+      'findPublishedBySlug',
+      async () => null,
+    );
     let requestUrl: URL | undefined;
     context.mock.method(
       globalThis,
@@ -186,5 +199,105 @@ describe('blog post controller', () => {
     assert.equal((response.body as { data: { slug: string } }).data.slug, 'slugged-article');
     assert.equal(requestUrl?.pathname, '/wp-json/wp/v2/posts');
     assert.equal(requestUrl?.searchParams.get('slug'), 'slugged-article');
+  });
+
+  it('serves published RoomReview database posts without contacting WordPress', async (context) => {
+    let wordPressRequested = false;
+    const now = new Date('2026-11-03T10:00:00.000Z');
+    context.mock.method(
+      blogPostRepository,
+      'findPublishedBySlug',
+      async () => ({
+        blog_post_id: 'fc3d08b4-6924-4a46-8115-c42e53b7f946',
+        title: 'Database article',
+        slug: 'database-article-fc3d08b4',
+        excerpt: 'A saved article',
+        content: 'Article body',
+        featured_image: null,
+        read_time: null,
+        status: 'PUBLISHED' as const,
+        category_id: null,
+        meta_title: null,
+        meta_description: null,
+        created_at: now,
+        updated_at: now,
+        published_at: now,
+        blog_categories: null,
+        blog_tags: [],
+      }),
+    );
+    context.mock.method(globalThis, 'fetch', async () => {
+      wordPressRequested = true;
+      throw new Error('WordPress should not be requested');
+    });
+
+    const response = createResponse();
+    await getBlogPostBySlug(
+      createRequest({}, '', 'database-article-fc3d08b4'),
+      response,
+    );
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(wordPressRequested, false);
+    assert.equal(
+      (response.body as { data: { content: string } }).data.content,
+      'Article body',
+    );
+  });
+
+  it('saves new articles as RoomReview database drafts', async (context) => {
+    let savedDraft:
+      | { title: string; excerpt: string; content: string }
+      | undefined;
+    const now = new Date('2026-11-03T10:00:00.000Z');
+    context.mock.method(
+      blogPostRepository,
+      'createDraft',
+      async (draft: { title: string; excerpt: string; content: string }) => {
+        savedDraft = draft;
+        return {
+          blog_post_id: 'fc3d08b4-6924-4a46-8115-c42e53b7f946',
+          title: draft.title,
+          slug: 'database-article-fc3d08b4',
+          excerpt: draft.excerpt,
+          content: draft.content,
+          featured_image: null,
+          read_time: null,
+          status: 'DRAFT' as const,
+          category_id: null,
+          meta_title: null,
+          meta_description: null,
+          created_at: now,
+          updated_at: now,
+          published_at: null,
+          blog_categories: null,
+          blog_tags: [],
+        };
+      },
+    );
+
+    const response = createResponse();
+    await createBlogPost(
+      createRequest({}, '', '', {
+        title: 'Database article',
+        content: 'Article body',
+      }),
+      response,
+    );
+
+    assert.equal(response.statusCode, 201);
+    assert.deepEqual(savedDraft, {
+      title: 'Database article',
+      excerpt: 'Article body',
+      content: 'Article body',
+    });
+    assert.equal(
+      (response.body as { data: { id: string } }).data.id,
+      'fc3d08b4-6924-4a46-8115-c42e53b7f946',
+    );
+    assert.equal(
+      (response.body as { message: string }).message,
+      'Blog post saved as a draft in RoomReview',
+    );
   });
 });
