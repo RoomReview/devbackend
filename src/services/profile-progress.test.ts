@@ -10,6 +10,7 @@ describe('profile progress', () => {
       contributions: 5,
       level: 2,
       levelName: 'Contributor',
+      levelContributionsRequired: 5,
       nextLevel: {
         level: 3,
         name: 'Local Expert',
