@@ -126,8 +126,23 @@ export const findPostcodeByCode = async (code: string, select?: PostcodeSelect):
 
 export interface FindPostcodesFilter {
   outcode?: string;
+  outcodePrefix?: string;
   boroughId?: string;
 }
+
+const buildPostcodeWhere = (filter?: FindPostcodesFilter): Record<string, unknown> => {
+  const where: Record<string, unknown> = {};
+  if (filter?.outcode) {
+    where.outcode = filter.outcode;
+  }
+  if (filter?.outcodePrefix) {
+    where.outcode = { startsWith: filter.outcodePrefix, mode: 'insensitive' };
+  }
+  if (filter?.boroughId) {
+    where.boroughId = filter.boroughId;
+  }
+  return where;
+};
 
 export const findAllPostcodes = async (
   limit: number,
@@ -136,12 +151,8 @@ export const findAllPostcodes = async (
   select?: PostcodeSelect,
   sortDirection: 'asc' | 'desc' = 'asc',
 ): Promise<PostcodeRecord[]> => {
-  const where: Record<string, unknown> = {};
-  if (filter?.outcode) where.outcode = filter.outcode;
-  if (filter?.boroughId) where.boroughId = filter.boroughId;
-
   return await getPostcodeClient().findMany({
-    where,
+    where: buildPostcodeWhere(filter),
     take: limit,
     skip: offset,
     orderBy: { code: sortDirection },
@@ -167,13 +178,7 @@ export const findPostcodesByIds = async (
   postcodeIds: string[],
   filter?: FindPostcodesFilter,
 ): Promise<PostcodeRecord[]> => {
-  const where: Record<string, unknown> = { postcodeId: { in: postcodeIds } };
-  if (filter?.outcode) {
-    where.outcode = filter.outcode;
-  }
-  if (filter?.boroughId) {
-    where.boroughId = filter.boroughId;
-  }
+  const where = { ...buildPostcodeWhere(filter), postcodeId: { in: postcodeIds } };
 
   return await getPostcodeClient().findMany({
     where,
@@ -196,11 +201,7 @@ export const findPostcodesByIds = async (
 };
 
 export const countPostcodes = async (filter?: FindPostcodesFilter) => {
-  const where: Record<string, unknown> = {};
-  if (filter?.outcode) where.outcode = filter.outcode;
-  if (filter?.boroughId) where.boroughId = filter.boroughId;
-
-  return await getPostcodeClient().count({ where }).catch((err: unknown) => {
+  return await getPostcodeClient().count({ where: buildPostcodeWhere(filter) }).catch((err: unknown) => {
     logContext.function = 'countPostcodes';
     logger.error(logContext, 'Error in countPostcodes repository', { error: err });
     throw new Error('DB: countPostcodes operation failed');
