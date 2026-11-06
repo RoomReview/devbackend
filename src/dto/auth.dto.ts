@@ -9,12 +9,21 @@ import {
   uuid,
 } from 'zod';
 
+const personName = string()
+  .trim()
+  .min(1, 'Name is required')
+  .max(100, 'Name must be 100 characters or fewer')
+  .regex(
+    /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u,
+    'Use letters only; spaces, apostrophes, hyphens and full stops are allowed',
+  );
+
 export const RegisterUserDto = object({
   email: email({ pattern: regexes.email }),
   inviteToken: string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
   password: string().min(6),
-  firstName: string().min(1),
-  lastName: string().min(1),
+  firstName: personName,
+  lastName: personName,
   role: enum_([
     UserRole['LANDLORD'],
     UserRole['TENANT'],
@@ -34,18 +43,25 @@ export const RegisterUserDto = object({
       path: ['role'],
     });
   }
-  if (data.role === UserRole['AGENCY'] || data.role === UserRole['AGENT']) {
+  if (data.role === UserRole['AGENT'] && !data.inviteToken) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Agent accounts can only be created from an agency invitation',
+      path: ['role'],
+    });
+  }
+  if (data.role === UserRole['AGENCY']) {
     if (!data.inviteToken && (!data.agencyName || data.agencyName.trim().length === 0)) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Agency name is required for agency or agent role',
+        message: 'Agency name is required for agency accounts',
         path: ['agencyName'],
       });
     }
     if (!data.inviteToken && (!data.agencyPhone || data.agencyPhone.trim().length === 0)) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Agency phone is required for agency or agent role',
+        message: 'Agency phone is required for agency accounts',
         path: ['agencyPhone'],
       });
     }
@@ -53,11 +69,11 @@ export const RegisterUserDto = object({
 });
 
 export const EarlyAccessRegisterDto = object({
-  firstName: string().trim().min(1),
-  lastName: string().trim().min(1),
+  firstName: personName,
+  lastName: personName,
   email: email({ pattern: regexes.email }),
   password: string().min(8),
-  role: enum_([UserRole['AGENCY'], UserRole['AGENT']]),
+  role: enum_([UserRole['AGENCY']]),
   agencyName: string().trim().min(1).max(150),
   agencyPhone: string().trim().min(1).max(50),
 });
