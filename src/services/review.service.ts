@@ -211,6 +211,29 @@ export const findApprovedReviewsByPostcode = async (
   }));
 };
 
+export const findApprovedReviewsByBorough = async (
+  boroughId: string,
+): Promise<Review[]> => {
+  const rows = await prisma.reviews.findMany({
+    where: {
+      status: 'APPROVED',
+      OR: [
+        { borough_id: boroughId },
+        { postcodes: { boroughId } },
+      ],
+    },
+    orderBy: { created_at: 'desc' },
+    include: {
+      users: { select: { firstName: true, lastName: true } },
+      postcodes: { select: { code: true } },
+    },
+  });
+  return rows.map((review) => ({
+    ...hideAnonymousAuthor(review),
+    incentivized: true,
+  }));
+};
+
 export const createReview = async (
   data: CreateReviewInput,
   authorId: string,
