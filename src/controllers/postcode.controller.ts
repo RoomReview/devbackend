@@ -13,6 +13,7 @@ export const getAllPostcodes = async (
 
   const filter = {
     outcode: req.query.outcode as string,
+    outcodePrefix: req.query.outcodePrefix as string,
     boroughId: req.query.boroughId as string,
   };
   const sortBy = req.query.sortBy as PostcodeSort | undefined;
