@@ -28,6 +28,7 @@ export const getProfileProgress = (
     contributions,
     level: currentLevel.level,
     levelName: currentLevel.name,
+    levelContributionsRequired: currentLevel.minimum,
     nextLevel: nextLevel
       ? {
           level: nextLevel.level,
