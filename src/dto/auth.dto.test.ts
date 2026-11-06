@@ -27,6 +27,32 @@ describe('RegisterUserDto Validation', () => {
     assert.strictEqual(result.success, true);
   });
 
+  it('accepts names with international letters and common punctuation', () => {
+    const result = RegisterUserDto.safeParse({
+      email: 'name@example.com',
+      password: 'password123',
+      firstName: 'Ana-María',
+      lastName: "O'Connor",
+      role: UserRole.TENANT,
+    });
+    assert.strictEqual(result.success, true);
+  });
+
+  it('rejects digits and punctuation-only values in personal names', () => {
+    const result = RegisterUserDto.safeParse({
+      email: 'name@example.com',
+      password: 'password123',
+      firstName: 'John2',
+      lastName: '---',
+      role: UserRole.TENANT,
+    });
+    assert.strictEqual(result.success, false);
+    if (!result.success) {
+      assert.ok(result.error.issues.some((issue) => issue.path.includes('firstName')));
+      assert.ok(result.error.issues.some((issue) => issue.path.includes('lastName')));
+    }
+  });
+
   describe('EarlyAccessRegisterDto Validation', () => {
     const validData = {
       firstName: 'Jane',
@@ -42,7 +68,7 @@ describe('RegisterUserDto Validation', () => {
       assert.strictEqual(EarlyAccessRegisterDto.safeParse(validData).success, true);
       assert.strictEqual(
         EarlyAccessRegisterDto.safeParse({ ...validData, role: UserRole.AGENT }).success,
-        true,
+        false,
       );
     });
 
@@ -96,7 +122,7 @@ describe('RegisterUserDto Validation', () => {
     if (!result.success) {
       const issue = result.error.issues.find((i) => i.path.includes('agencyName'));
       assert.ok(issue);
-      assert.strictEqual(issue.message, 'Agency name is required for agency or agent role');
+      assert.strictEqual(issue.message, 'Agency name is required for agency accounts');
     }
   });
 
@@ -138,29 +164,32 @@ describe('RegisterUserDto Validation', () => {
     assert.strictEqual(result.success, false);
   });
 
-  it('should fail validation for AGENT role without agencyName', () => {
+  it('rejects standalone AGENT registration', () => {
     const data = {
       email: 'agent@example.com',
       password: 'password123',
       firstName: 'Agent',
       lastName: 'One',
       role: UserRole.AGENT,
+      agencyName: 'Top Agency',
+      agencyPhone: '+442012345678',
     };
     const result = RegisterUserDto.safeParse(data);
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      const issue = result.error.issues.find((i) => i.path.includes('agencyName'));
+      const issue = result.error.issues.find((i) => i.path.includes('role'));
       assert.ok(issue);
+      assert.strictEqual(issue.message, 'Agent accounts can only be created from an agency invitation');
     }
   });
 
-  it('should fail validation for agency and agent roles without agencyPhone', () => {
+  it('should fail validation for AGENCY role without agencyPhone', () => {
     const data = {
-      email: 'agent@example.com',
+      email: 'agency@example.com',
       password: 'password123',
-      firstName: 'Agent',
-      lastName: 'One',
-      role: UserRole.AGENT,
+      firstName: 'Agency',
+      lastName: 'Owner',
+      role: UserRole.AGENCY,
       agencyName: 'Top Agency',
     };
     const result = RegisterUserDto.safeParse(data);
