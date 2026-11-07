@@ -1,10 +1,17 @@
 import config from '@config/index';
-import { InternalServerError, ValidationError } from '@/utils/custom-error';
+import {
+  CustomError,
+  InternalServerError,
+  ValidationError,
+} from '@/utils/custom-error';
 import logger from '@/utils/logger';
 
 const AWIN_API_ORIGIN = 'https://api.awin.com';
 const MAX_TRANSACTION_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
 const MAX_AWIN_ERROR_DETAILS_LENGTH = 500;
+const DEFAULT_AWIN_RATE_LIMIT_MS = 60 * 1000;
+
+let awinRateLimitUntil = 0;
 
 export interface AwinPublisherAccount {
   publisherId: number;
@@ -185,10 +192,64 @@ const getApiToken = (): string => {
   return token;
 };
 
+const getAwinNetworkErrorDetails = (
+  error: unknown,
+  token: string,
+  depth = 0,
+): Record<string, unknown> => {
+  if (depth >= 3 || !(error instanceof Error)) {
+    return { message: 'Unknown network error' };
+  }
+
+  const errorWithCode = error as Error & { code?: unknown; cause?: unknown };
+  const message = error.message.replaceAll(token, '[REDACTED]').slice(0, 500);
+  return {
+    name: error.name,
+    message,
+    ...(typeof errorWithCode.code === 'string'
+      ? { code: errorWithCode.code }
+      : {}),
+    ...(errorWithCode.cause !== undefined
+      ? { cause: getAwinNetworkErrorDetails(errorWithCode.cause, token, depth + 1) }
+      : {}),
+  };
+};
+
+const getRetryAfterSeconds = (retryAfter: string | null): number => {
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.max(1, Math.ceil(seconds));
+    }
+
+    const retryAt = Date.parse(retryAfter);
+    if (Number.isFinite(retryAt)) {
+      return Math.max(1, Math.ceil((retryAt - Date.now()) / 1000));
+    }
+  }
+
+  return DEFAULT_AWIN_RATE_LIMIT_MS / 1000;
+};
+
+const createAwinRateLimitError = (
+  retryAfterSeconds: number,
+): CustomError<string> =>
+  new CustomError({
+    message: `Awin API rate limit reached. Try again in ${retryAfterSeconds} seconds.`,
+    statusCode: 429,
+    code: 'AWIN_RATE_LIMITED',
+    data: { retryAfterSeconds },
+  });
+
 const requestAwin = async (
   path: string,
   options: AwinRequestOptions = {},
 ): Promise<unknown> => {
+  const remainingCooldownMs = awinRateLimitUntil - Date.now();
+  if (remainingCooldownMs > 0) {
+    throw createAwinRateLimitError(Math.ceil(remainingCooldownMs / 1000));
+  }
+
   const url = new URL(path, AWIN_API_ORIGIN);
   const token = getApiToken();
   if (options.query) {
@@ -215,7 +276,16 @@ const requestAwin = async (
         : { body: JSON.stringify(options.body) }),
       signal: AbortSignal.timeout(15_000),
     });
-  } catch {
+  } catch (error) {
+    logger.error(
+      { service: 'AwinApi', function: 'requestAwin' },
+      'Could not connect to the Awin API',
+      {
+        method,
+        path: url.pathname,
+        error: getAwinNetworkErrorDetails(error, token),
+      },
+    );
     throw new InternalServerError({
       message: 'Could not connect to the Awin API.',
       code: 'INTERNAL_SERVER_ERROR',
@@ -237,7 +307,8 @@ const requestAwin = async (
       );
     }
 
-    logger.error(
+    const logAwinFailure = response.status === 429 ? logger.warn : logger.error;
+    logAwinFailure(
       { service: 'AwinApi', function: 'requestAwin' },
       'Awin API request failed',
       {
@@ -253,8 +324,18 @@ const requestAwin = async (
           : undefined,
       },
     );
+    if (response.status === 429) {
+      const retryAfterSeconds = getRetryAfterSeconds(
+        response.headers.get('retry-after'),
+      );
+      awinRateLimitUntil = Math.max(
+        awinRateLimitUntil,
+        Date.now() + retryAfterSeconds * 1000,
+      );
+      throw createAwinRateLimitError(retryAfterSeconds);
+    }
     throw new InternalServerError({
-      message: `Awin API GET ${url.pathname} failed with HTTP ${response.status}.`,
+      message: `Awin API ${method} ${url.pathname} failed with HTTP ${response.status}.`,
       code: 'INTERNAL_SERVER_ERROR',
     });
   }
@@ -533,10 +614,8 @@ export const getAwinPromotions = async (
     });
   }
 
-  const [active, upcoming] = await Promise.all([
-    getAwinPromotionsByStatus(publisherId, 'active'),
-    getAwinPromotionsByStatus(publisherId, 'upcoming'),
-  ]);
+  const active = await getAwinPromotionsByStatus(publisherId, 'active');
+  const upcoming = await getAwinPromotionsByStatus(publisherId, 'upcoming');
   const uniquePromotions = new Map<number, AwinPromotion>();
   for (const promotion of [...active, ...upcoming]) {
     const current = uniquePromotions.get(promotion.promotionId);
