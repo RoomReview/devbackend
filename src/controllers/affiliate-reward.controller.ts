@@ -21,7 +21,7 @@ import {
   listAwinPublisherAccounts,
   syncAwinTransactions,
 } from '@/services/awin-transaction.service';
-import { syncAwinOffers } from '@/services/awin-offer.service';
+import { syncAwinOffersBatch } from '@/services/awin-offer.service';
 
 const requireUserId = (req: AuthenticatedRequest): string => {
   const userId = req.user?.userId;
@@ -167,8 +167,8 @@ export const syncAwinOffersForAdmin = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  const { publisherId } = SyncAwinOffersDto.parse(req.body);
-  const data = await syncAwinOffers(publisherId);
+  const { publisherId, cursor } = SyncAwinOffersDto.parse(req.body);
+  const data = await syncAwinOffersBatch(publisherId, cursor);
   const response: ApiResponse<typeof data> = {
     success: true,
     statusCode: 200,
