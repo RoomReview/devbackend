@@ -73,6 +73,51 @@ const logContext: LogContext = {
   function: '',
 };
 
+const getSendGridErrors = (responseBody: string) => {
+  try {
+    const payload: unknown = JSON.parse(responseBody);
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      !('errors' in payload) ||
+      !Array.isArray(payload.errors)
+    ) {
+      return [];
+    }
+
+    return payload.errors.flatMap((error) => {
+      if (!error || typeof error !== 'object' || !('message' in error)) {
+        return [];
+      }
+
+      const message =
+        typeof error.message === 'string'
+          ? error.message
+              .replace(
+                /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
+                '[redacted email]',
+              )
+              .slice(0, 500)
+          : '';
+      if (!message) {
+        return [];
+      }
+
+      return [
+        {
+          message,
+          field:
+            'field' in error && typeof error.field === 'string'
+              ? error.field.slice(0, 200)
+              : null,
+        },
+      ];
+    });
+  } catch {
+    return [];
+  }
+};
+
 const sendEmail = async (data: SendGridMailData) => {
   logContext.function = 'sendEmail';
   if (!config.sendGridApiKey) {
@@ -104,6 +149,13 @@ const sendEmail = async (data: SendGridMailData) => {
       body: JSON.stringify(toSendGridPayload(data)),
     });
     if (!response.ok) {
+      const responseBody = await response.text();
+      const errors = getSendGridErrors(responseBody);
+      logger.error(logContext, 'SendGrid rejected email request', {
+        status: response.status,
+        errors,
+        responseBodyPresent: Boolean(responseBody),
+      });
       throw new Error(`SendGrid returned HTTP ${response.status}`);
     }
     logger.info(logContext, 'Email sent successfully', {
