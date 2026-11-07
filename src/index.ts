@@ -16,7 +16,13 @@ import { configurePassport } from '@utils/sso.login';
 import logger from '@utils/logger';
 import * as paymentController from './controllers/payment.controller';
 import { startScoreReportWorker } from '@/services/score-report.service';
-import { getRequestRateLimitKey, rateLimit } from '@middleware/rateLimit.middleware';
+import { startNewsletterWorker } from '@/services/newsletter.service';
+import { startAwinOfferSyncWorker } from '@/services/awin-offer.service';
+import { startUnverifiedAccountCleanupWorker } from '@/services/unverified-account-cleanup.service';
+import {
+  getRequestRateLimitKey,
+  rateLimit,
+} from '@middleware/rateLimit.middleware';
 
 dotenv.config();
 
@@ -27,10 +33,16 @@ if (!Number.isInteger(trustedProxyHops) || trustedProxyHops < 0) {
   throw new Error('TRUST_PROXY_HOPS must be a non-negative integer.');
 }
 app.set('trust proxy', trustedProxyHops);
-const isTestProcess = process.env.NODE_ENV === 'test'
-  || process.env.NODE_TEST_CONTEXT !== undefined
-  || process.argv.includes('--test');
-if (!isTestProcess) void startScoreReportWorker();
+const isTestProcess =
+  process.env.NODE_ENV === 'test' ||
+  process.env.NODE_TEST_CONTEXT !== undefined ||
+  process.argv.includes('--test');
+if (!isTestProcess) {
+  void startScoreReportWorker();
+  startNewsletterWorker();
+  startAwinOfferSyncWorker();
+  startUnverifiedAccountCleanupWorker();
+}
 
 // Middleware
 app.use(assignRequestId());
@@ -38,7 +50,11 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan(getCustomMorganFormat));
 app.get('/api/v1/payments/webhook', paymentController.webhookStatus);
-app.post('/api/v1/payments/webhook', express.raw({ type: 'application/json' }), paymentController.handleWebhook);
+app.post(
+  '/api/v1/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  paymentController.handleWebhook,
+);
 app.use(
   '/api/v1',
   rateLimit({
@@ -48,6 +64,7 @@ app.use(
     key: getRequestRateLimitKey,
   }),
 );
+app.use('/api/v1/blog/posts', express.json({ limit: '8mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -64,7 +81,9 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // Root route for basic backend readiness
 app.get('/', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', message: 'RoomReview backend is running' });
+  res
+    .status(200)
+    .json({ status: 'ok', message: 'RoomReview backend is running' });
 });
 
 app.use(notFoundHandler);
