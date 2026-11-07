@@ -30,17 +30,23 @@ const shouldLog = (level: LogLevel): boolean => {
   return levels[level] >= levels[getCurrentLogLevel()];
 };
 
-const serializeData = (data: unknown): unknown => {
+const serializeData = (data: unknown, depth = 0): unknown => {
+  if (depth > 5) {
+    return '[Cause chain truncated]';
+  }
   if (data instanceof Error) {
     return {
       name: data.name,
       message: data.message,
       stack: data.stack,
+      ...('cause' in data ? { cause: serializeData(data.cause, depth + 1) } : {}),
     };
   }
-  if (Array.isArray(data)) return data.map(serializeData);
+  if (Array.isArray(data)) {
+    return data.map((value) => serializeData(value, depth + 1));
+  }
   if (data && typeof data === 'object') {
-    return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, serializeData(value)]));
+    return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, serializeData(value, depth + 1)]));
   }
   return data;
 };
