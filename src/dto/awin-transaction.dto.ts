@@ -30,4 +30,11 @@ export const SyncAwinTransactionsDto = object({
 
 export const SyncAwinOffersDto = object({
   publisherId: number().int().positive().safe(),
+  cursor: object({
+    status: enum_(['active', 'upcoming']),
+    page: number().int().positive().max(1000),
+    syncStartedAt: string().datetime(),
+  })
+    .strict()
+    .optional(),
 }).strict();
