@@ -30,6 +30,7 @@ export const CreateAffiliateOfferDto = object({
   logoUrl,
   description: string().trim().min(1).max(2000),
   discountDetails: string().trim().max(1000).nullable().optional(),
+  voucherCode: string().trim().max(100).nullable().optional(),
   trackingUrl: awinTrackingUrl,
   awinApproved: boolean(),
   isActive: boolean(),
