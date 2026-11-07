@@ -570,8 +570,79 @@ export const getAwinTransactions = async (
   return parseAwinTransactions(await requestAwin(path, { query }));
 };
 
-const AWIN_PROMOTION_PAGE_SIZE = 200;
+const AWIN_PROMOTION_PAGE_SIZE = 50;
 const MAX_AWIN_PROMOTION_PAGES = 1000;
+
+export interface AwinPromotionCursor {
+  status: 'active' | 'upcoming';
+  page: number;
+}
+
+export interface AwinPromotionPage {
+  promotions: AwinPromotion[];
+  nextCursor: AwinPromotionCursor | null;
+}
+
+export const getAwinPromotionsPage = async (
+  publisherId: number,
+  cursor: AwinPromotionCursor,
+): Promise<AwinPromotionPage> => {
+  if (!Number.isSafeInteger(publisherId) || publisherId <= 0) {
+    throw new ValidationError({
+      message: 'A valid Awin publisher ID is required.',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+  if (
+    !Number.isSafeInteger(cursor.page) ||
+    cursor.page < 1 ||
+    cursor.page > MAX_AWIN_PROMOTION_PAGES ||
+    !['active', 'upcoming'].includes(cursor.status)
+  ) {
+    throw new ValidationError({
+      message: 'A valid Awin promotion page cursor is required.',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  const payload = await requestAwin(`/publisher/${publisherId}/promotions`, {
+    method: 'POST',
+    includeAccessTokenQuery: true,
+    body: {
+      filters: {
+        membership: 'all',
+        regionCodes: ['GB'],
+        status: cursor.status,
+        type: 'all',
+      },
+      pagination: { page: cursor.page, pageSize: AWIN_PROMOTION_PAGE_SIZE },
+    },
+  });
+  const rows = asList(payload);
+  if (rows.length > AWIN_PROMOTION_PAGE_SIZE) {
+    throw new InternalServerError({
+      message: 'Awin returned more promotions than the requested batch size.',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
+  const promotions = parseAwinPromotions(rows);
+  let nextCursor: AwinPromotionCursor | null;
+  if (rows.length === AWIN_PROMOTION_PAGE_SIZE) {
+    if (cursor.page === MAX_AWIN_PROMOTION_PAGES) {
+      throw new InternalServerError({
+        message: 'Awin returned more promotion pages than the sync limit allows.',
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    nextCursor = { status: cursor.status, page: cursor.page + 1 };
+  } else if (cursor.status === 'active') {
+    nextCursor = { status: 'upcoming', page: 1 };
+  } else {
+    nextCursor = null;
+  }
+
+  return { promotions, nextCursor };
+};
 
 const getAwinPromotionsByStatus = async (
   publisherId: number,
@@ -579,22 +650,12 @@ const getAwinPromotionsByStatus = async (
 ): Promise<AwinPromotion[]> => {
   const promotions: AwinPromotion[] = [];
   for (let page = 1; page <= MAX_AWIN_PROMOTION_PAGES; page += 1) {
-    const payload = await requestAwin(`/publisher/${publisherId}/promotions`, {
-      method: 'POST',
-      includeAccessTokenQuery: true,
-      body: {
-        filters: {
-          membership: 'all',
-          regionCodes: ['GB'],
-          status,
-          type: 'all',
-        },
-        pagination: { page, pageSize: AWIN_PROMOTION_PAGE_SIZE },
-      },
-    });
-    const rows = asList(payload);
-    promotions.push(...parseAwinPromotions(rows));
-    if (rows.length < AWIN_PROMOTION_PAGE_SIZE) {
+    const result = await getAwinPromotionsPage(publisherId, { status, page });
+    promotions.push(...result.promotions);
+    if (
+      result.nextCursor?.status !== status ||
+      result.nextCursor?.page !== page + 1
+    ) {
       return promotions;
     }
   }
