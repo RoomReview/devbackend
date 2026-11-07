@@ -219,6 +219,11 @@ export const resetEmailVerification = async (email: string) => {
   const token = generateVerificationCode();
 
   await updateUserVerifyCode(user.email, token.hashedCode, token.expiresAt);
+  await sendVerificationEmail(
+    user.email,
+    token.code,
+    `${user.firstName} ${user.lastName}`,
+  );
 
   return { isNewCodeGenerated: true };
 };
