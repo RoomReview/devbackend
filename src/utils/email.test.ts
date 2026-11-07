@@ -32,15 +32,17 @@ interface CapturedEmail {
 
 const emailRequests: Array<{ url: string; init?: RequestInit }> = [];
 let responseStatus = 202;
+let responseBody = '';
 
 mock.method(globalThis, 'fetch', async (input, init) => {
   emailRequests.push({ url: String(input), init });
-  return new Response(null, { status: responseStatus });
+  return new Response(responseBody || null, { status: responseStatus });
 });
 
 beforeEach(() => {
   emailRequests.length = 0;
   responseStatus = 202;
+  responseBody = '';
 });
 
 const getLastEmail = (): CapturedEmail => {
@@ -351,12 +353,39 @@ describe('sendEmail', () => {
     if (!config.sendGridApiKey) {
       (config as any).sendGridApiKey = 'test';
     }
-    responseStatus = 401;
+    responseStatus = 400;
+    responseBody = JSON.stringify({
+      errors: [
+        {
+          message:
+            'The sender sender@example.com is not authorized.',
+          field: 'from.email',
+        },
+      ],
+    });
+    const loggedErrors: string[] = [];
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      loggedErrors.push(
+        args
+          .map((argument) =>
+            typeof argument === 'string' ? argument : JSON.stringify(argument),
+          )
+          .join(' '),
+      );
+    };
 
-    await assert.rejects(
-      sendVerificationEmail('test@example.com', '123456', 'Test'),
-      { message: 'Failed to send email' },
-    );
+    try {
+      await assert.rejects(
+        sendVerificationEmail('test@example.com', '123456', 'Test'),
+        { message: 'Failed to send email' },
+      );
+    } finally {
+      console.error = originalConsoleError;
+    }
+
+    assert.match(loggedErrors.join('\n'), /The sender \[redacted email\] is not authorized/);
+    assert.doesNotMatch(loggedErrors.join('\n'), /sender@example\.com/);
   });
 
   it('should throw error if sendGridApiKey is not defined', async () => {
