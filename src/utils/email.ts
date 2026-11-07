@@ -25,26 +25,42 @@ interface SendGridMailData {
 const toSendGridPayload = (data: SendGridMailData) => {
   const {
     templateId,
+    to,
+    text,
+    html,
     personalizations,
     mailSettings,
     trackingSettings,
     asm,
     ...message
   } = data;
+  const normalizeRecipients = (recipients: EmailAddress | EmailAddress[]) =>
+    (Array.isArray(recipients) ? recipients : [recipients]).map((recipient) =>
+      typeof recipient === 'string' ? { email: recipient } : recipient,
+    );
+  const normalizedPersonalizations = personalizations
+    ? personalizations.map(({ to: recipients, dynamicTemplateData, ...personalization }) => ({
+        ...personalization,
+        to: normalizeRecipients(recipients),
+        ...(dynamicTemplateData
+          ? { dynamic_template_data: dynamicTemplateData }
+          : {}),
+      }))
+    : to
+      ? [{ to: normalizeRecipients(to) }]
+      : undefined;
+  const content = [
+    ...(text ? [{ type: 'text/plain', value: text }] : []),
+    ...(html ? [{ type: 'text/html', value: html }] : []),
+  ];
 
   return {
     ...message,
+    ...(content.length ? { content } : {}),
     ...(templateId !== undefined ? { template_id: templateId } : {}),
-    ...(personalizations
+    ...(normalizedPersonalizations
       ? {
-          personalizations: personalizations.map(
-            ({ dynamicTemplateData, ...personalization }) => ({
-              ...personalization,
-              ...(dynamicTemplateData
-                ? { dynamic_template_data: dynamicTemplateData }
-                : {}),
-            }),
-          ),
+          personalizations: normalizedPersonalizations,
         }
       : {}),
     ...(mailSettings
@@ -156,7 +172,14 @@ const sendEmail = async (data: SendGridMailData) => {
         errors,
         responseBodyPresent: Boolean(responseBody),
       });
-      throw new Error(`SendGrid returned HTTP ${response.status}`);
+      const errorDetails = errors
+        .map(({ message, field }) => `${field ? `${field}: ` : ''}${message}`)
+        .join('; ');
+      throw new Error(
+        errorDetails
+          ? `SendGrid returned HTTP ${response.status}: ${errorDetails}`
+          : `SendGrid returned HTTP ${response.status} without error details`,
+      );
     }
     logger.info(logContext, 'Email sent successfully', {
       to: data.personalizations?.[0]?.to,
