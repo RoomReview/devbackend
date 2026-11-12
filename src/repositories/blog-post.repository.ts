@@ -24,7 +24,19 @@ export const blogPostRepository = {
   findById: (id: string) =>
     prisma.blog_posts.findUnique({ where: { blog_post_id: id } }),
 
-  createDraft: (post: { title: string; excerpt: string; content: string }) => {
+  findByIdWithRelations: (id: string) =>
+    prisma.blog_posts.findUnique({
+      where: { blog_post_id: id },
+      include: { blog_categories: true, blog_tags: true },
+    }),
+
+  createDraft: (post: {
+    title: string;
+    author: string;
+    excerpt: string;
+    content: string;
+    featuredImage: string | null;
+  }) => {
     const id = randomUUID();
     const baseSlug =
       post.title
@@ -39,9 +51,11 @@ export const blogPostRepository = {
       data: {
         blog_post_id: id,
         title: post.title,
+        author: post.author,
         slug: `${baseSlug}-${id.slice(0, 8)}`,
         excerpt: post.excerpt,
         content: post.content,
+        featured_image: post.featuredImage,
         status: 'DRAFT',
         created_at: new Date(),
         updated_at: new Date(),
@@ -52,11 +66,24 @@ export const blogPostRepository = {
 
   update: (
     id: string,
-    post: { title: string; excerpt: string; content: string },
+    post: {
+      title: string;
+      author: string;
+      excerpt: string;
+      content: string;
+      featuredImage: string | null;
+    },
   ) =>
     prisma.blog_posts.update({
       where: { blog_post_id: id },
-      data: { ...post, updated_at: new Date() },
+      data: {
+        title: post.title,
+        author: post.author,
+        excerpt: post.excerpt,
+        content: post.content,
+        featured_image: post.featuredImage,
+        updated_at: new Date(),
+      },
       include: { blog_categories: true, blog_tags: true },
     }),
 
@@ -73,4 +100,9 @@ export const blogPostRepository = {
 
   delete: (id: string) =>
     prisma.blog_posts.delete({ where: { blog_post_id: id } }),
+
+  deleteDraft: (id: string) =>
+    prisma.blog_posts.deleteMany({
+      where: { blog_post_id: id, status: 'DRAFT' },
+    }),
 };
