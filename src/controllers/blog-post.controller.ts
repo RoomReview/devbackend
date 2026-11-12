@@ -3,6 +3,11 @@ import type { ApiResponse } from '@/types';
 import { blogPostRepository } from '@/repositories/blog-post.repository';
 import { EntityNotFoundError } from '@/utils/custom-error';
 import logger from '@/utils/logger';
+import {
+  getBlogFeaturedImage,
+  NoSuchKey,
+  uploadBlogFeaturedImage,
+} from '@/services/blog-featured-image.service';
 
 interface WordPressTerm {
   id: number;
@@ -236,7 +241,7 @@ const mapWordPressPost = (post: WordPressEmbeddedPost): BlogPost => ({
 
 const mapDatabasePost = (
   post: NonNullable<
-    Awaited<ReturnType<typeof blogPostRepository.findPublishedBySlug>>
+    Awaited<ReturnType<typeof blogPostRepository.findByIdWithRelations>>
   >,
   includeContent = false,
 ): BlogPost => ({
@@ -247,7 +252,7 @@ const mapDatabasePost = (
   title: post.title,
   excerpt: post.excerpt,
   ...(includeContent ? { content: post.content } : {}),
-  author: 'RoomReview Editorial',
+  author: post.author || 'RoomReview Editorial',
   image: post.featured_image ?? '',
   categories: post.blog_categories ? [post.blog_categories.name] : [],
   tags: post.blog_tags.map((tag) => tag.name),
@@ -371,6 +376,30 @@ export const getBlogPostById = async (
   }
 };
 
+export const getDraftBlogPostPreview = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const routeId = req.params.id;
+  const id = Array.isArray(routeId) ? (routeId[0] ?? '') : routeId;
+  const draft = await blogPostRepository.findByIdWithRelations(id);
+  if (draft?.status !== 'DRAFT') {
+    res.status(404).json({
+      success: false,
+      statusCode: 404,
+      error: 'Blog draft not found',
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    statusCode: 200,
+    data: mapDatabasePost(draft, true),
+    message: 'Blog draft preview fetched successfully',
+  });
+};
+
 export const getBlogPostBySlug = async (
   req: Request,
   res: Response,
@@ -448,8 +477,10 @@ export const createBlogPost = async (
   const content = req.body.content as string;
   const post = await blogPostRepository.createDraft({
     title,
+    author: (req.body.author as string | undefined) ?? 'RoomReview Editorial',
     excerpt: (req.body.excerpt as string | undefined) ?? content.slice(0, 300),
     content,
+    featuredImage: (req.body.featuredImage as string | null | undefined) ?? null,
   });
 
   blogPostsCache.clear();
@@ -503,10 +534,15 @@ export const updateBlogPost = async (
 
   const post = await blogPostRepository.update(id, {
     title: req.body.title as string,
+    author: (req.body.author as string | undefined) ?? existingPost.author,
     excerpt:
       (req.body.excerpt as string | undefined) ??
       (req.body.content as string).slice(0, 300),
     content: req.body.content as string,
+    featuredImage:
+      req.body.featuredImage === undefined
+        ? existingPost.featured_image
+        : (req.body.featuredImage as string | null),
   });
   blogPostsCache.clear();
   const response: ApiResponse<BlogPost> = {
@@ -516,6 +552,52 @@ export const updateBlogPost = async (
     message: 'Blog post updated successfully',
   };
   res.status(200).json(response);
+};
+
+export const uploadBlogPostFeaturedImage = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const { contentType, imageBase64 } = req.body as {
+    contentType: string;
+    imageBase64: string;
+  };
+  const image = await uploadBlogFeaturedImage(contentType, imageBase64);
+  res.status(201).json({
+    success: true,
+    statusCode: 201,
+    data: { image },
+    message: 'Blog featured image uploaded successfully',
+  });
+};
+
+export const getBlogPostFeaturedImage = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const routeFilename = req.params.filename;
+  const filename = Array.isArray(routeFilename)
+    ? (routeFilename[0] ?? '')
+    : routeFilename;
+  try {
+    const image = await getBlogFeaturedImage(filename);
+    if (!image) {
+      res.status(404).end();
+      return;
+    }
+    res
+      .status(200)
+      .type(image.contentType)
+      .set('X-Content-Type-Options', 'nosniff')
+      .set('Cache-Control', 'public, max-age=31536000, immutable')
+      .send(image.body);
+  } catch (error) {
+    if (error instanceof NoSuchKey) {
+      res.status(404).end();
+      return;
+    }
+    throw error;
+  }
 };
 
 export const deleteBlogPost = async (
@@ -538,6 +620,30 @@ export const deleteBlogPost = async (
     statusCode: 200,
     data: null,
     message: 'Blog post deleted successfully',
+  };
+  res.status(200).json(response);
+};
+
+export const cancelBlogPostDraft = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const routeId = req.params.id;
+  const id = Array.isArray(routeId) ? (routeId[0] ?? '') : routeId;
+  const result = await blogPostRepository.deleteDraft(id);
+  if (result.count === 0) {
+    throw new EntityNotFoundError({
+      message: 'Blog draft not found',
+      code: 'ENTITY_NOT_FOUND',
+    });
+  }
+
+  blogPostsCache.clear();
+  const response: ApiResponse<null> = {
+    success: true,
+    statusCode: 200,
+    data: null,
+    message: 'Blog draft cancelled successfully',
   };
   res.status(200).json(response);
 };
