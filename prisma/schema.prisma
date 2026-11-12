@@ -390,6 +390,7 @@ model blog_posts {
   blog_post_id     String           @id @db.Uuid
   title            String
   slug             String           @unique
+  author           String           @default("RoomReview Editorial")
   excerpt          String
   content          String
   featured_image   String?
