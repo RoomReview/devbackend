@@ -64,7 +64,7 @@ app.use(
     key: getRequestRateLimitKey,
   }),
 );
-app.use('/api/v1/blog/posts', express.json({ limit: '8mb' }));
+app.use('/api/v1/blog/posts', express.json({ limit: '32mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
