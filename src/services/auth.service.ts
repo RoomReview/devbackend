@@ -94,7 +94,6 @@ export const registerUser = async (
       normalizedData.email,
       token.code,
       `${data.firstName} ${data.lastName}`,
-      data.inviteToken,
     );
     emailSent = true;
   } catch (error) {
