@@ -196,7 +196,6 @@ export const sendVerificationEmail = async (
   toEmail: string,
   code: string,
   name: string,
-  teamInviteToken?: string,
 ) => {
   if (!toEmail) {
     throw new Error('toEmail is not defined');
@@ -207,22 +206,6 @@ export const sendVerificationEmail = async (
   if (!name) {
     throw new Error('name is not defined');
   }
-  const verificationBaseUrl =
-    config.nodeEnv === 'production'
-      ? 'https://roomreview.co.uk'
-      : config.frontendUrl;
-  const verificationUrl = new URL('/verify-email', verificationBaseUrl);
-  verificationUrl.searchParams.set('email', toEmail);
-  verificationUrl.searchParams.set('code', code);
-  if (teamInviteToken) {
-    verificationUrl.searchParams.set('teamInviteToken', teamInviteToken);
-  }
-  if (
-    config.nodeEnv === 'production' &&
-    verificationUrl.protocol !== 'https:'
-  ) {
-    throw new Error('Verification email links must use HTTPS in production');
-  }
   const escapeHtml = (value: string) =>
     value
       .replace(/&/g, '&amp;')
@@ -231,7 +214,6 @@ export const sendVerificationEmail = async (
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   const greetingName = escapeHtml(name);
-  const linkHref = escapeHtml(verificationUrl.toString());
 
   const data: SendGridMailData = {
     from: {
@@ -239,8 +221,8 @@ export const sendVerificationEmail = async (
       name: 'RoomReview',
     },
     subject: 'Verify your RoomReview email address',
-    text: `Hi ${name},\n\nVerify your email address by opening this link:\n${verificationUrl}\n\nOr enter this verification code: ${code}\n\nRoomReview`,
-    html: `<p>Hi ${greetingName},</p><p>Verify your email address by clicking the link below:</p><p><a href="${linkHref}">Verify my email address</a></p><p>If the button does not work, enter this verification code on RoomReview:</p><p><strong>${escapeHtml(code)}</strong></p><p>RoomReview</p>`,
+    text: `Hi ${name},\n\nEnter this verification code on RoomReview to verify your email address: ${code}\n\nRoomReview`,
+    html: `<p>Hi ${greetingName},</p><p>Enter this verification code on RoomReview to verify your email address:</p><p><strong>${escapeHtml(code)}</strong></p><p>RoomReview</p>`,
     categories: ['verification'],
     personalizations: [
       {
